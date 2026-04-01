@@ -20,28 +20,30 @@ He thong tu dong cao, dich va tom tat tin tuc bang AI theo chuyen muc.
 ### Terminal 1: Backend API
 ```bash
 cd news-aggregator-backend
+.\venv\Scripts\activate
 uvicorn app.main:app --reload
 ```
 
 ### Terminal 2: Celery Worker
 ```bash
 cd news-aggregator-backend
+.\venv\Scripts\activate
 celery -A app.worker.celery_app worker --loglevel=info -P solo
 ```
 
 ### Terminal 3: Celery Beat (Lich trinh)
 ```bash
 cd news-aggregator-backend
+.\venv\Scripts\activate
 celery -A app.worker.celery_app beat --loglevel=info
 ```
 
 ### Terminal 4: Frontend
 ```bash
-cd news-aggregator-frontend
 npm run dev
 ```
 
 ## Script cong cu
-- `python reset_db.py`: Xoa sach va tao lai database.
-- `python test_full_system.py`: Chay thu cao tin toan bo chuyen muc ngay lap tuc.
-- `python seed_source.py`: Nap danh sach nguon tin ban dau.
+- `cd news-aggregator-backend && .\venv\Scripts\activate && python reset_db.py`
+- `cd news-aggregator-backend && .\venv\Scripts\activate && python test_full_system.py`
+- `cd news-aggregator-backend && .\venv\Scripts\activate && python seed_source.py`
