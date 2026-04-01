@@ -15,7 +15,23 @@ export async function generateStaticParams() {
 export default async function ArticlePage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
   const realArticle = await getArticleById(resolvedParams.id);
-  const article = realArticle || mockArticles[0];
+  
+  if (!realArticle) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Header />
+        <main className="max-w-3xl mx-auto px-6 py-20 text-center">
+           <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 mb-10 cursor-pointer">
+            <i className="ri-arrow-left-line"></i> Quay lại trang chủ
+          </Link>
+          <div className="text-gray-400">Không tìm thấy bài viết hoặc bài viết đang trong quá trình xử lý AI...</div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  const article = realArticle;
   const related = mockArticles.filter(a => a.category === article.category && a.id !== article.id).slice(0, 3);
 
   return (

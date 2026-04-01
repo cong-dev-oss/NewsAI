@@ -65,14 +65,16 @@ async def _crawl_and_process_flow(source_url: str, category: str):
     if not raw_article:
         return {"status": "error", "message": f"Couldn't crawl {source_url}"}
         
-    # Step 2: Translate Title (Dịch sang tiếng Việt ngay từ đầu)
-    title_vn = await ai_service.translate_title(raw_article['title'])
+    # Step 2: Translate Title (Dịch sang và Lọc rác AI)
+    raw_title = await ai_service.translate_title(raw_article['title'])
+    title_vn = "\n".join([line for line in raw_title.split('\n') if not any(k in line for k in ["Nhiệm vụ:", "HÀNH ĐỘNG:", "Dịch là:", "Kết quả:"])]).strip()
     
-    # Step 3: Dịch nội dung bài báo sang tiếng Việt nếu cần
-    content_vn = await ai_service.translate_text(raw_article['content'])
+    # Step 3: Dịch nội dung và Lọc rác bài báo
+    raw_content_vn = await ai_service.translate_text(raw_article['content'])
+    content_vn = "\n".join([line for line in raw_content_vn.split('\n') if not any(k in line for k in ["QUY TẮC:", "HÀNH ĐỘNG:", "Dịch thuật:", "Văn bản gốc:"])]).strip()
         
     # Step 4: Summarize AI (Dịch & Tóm tắt AI)
-    summary = await ai_service.summarize_text(content_vn) # Tóm tắt từ nội dung Việt đã dịch
+    summary = await ai_service.summarize_text(content_vn) 
     if not summary:
         summary = content_vn[:200] + "..." 
         

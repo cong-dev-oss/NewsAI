@@ -32,7 +32,7 @@ class AIService:
     async def translate_title(self, title: str) -> Optional[str]:
         """Dịch tiêu đề sang tiếng Việt nhưng giữ thuật ngữ chuyên ngành"""
         try:
-            prompt = f"Nhiệm vụ: Dịch tiêu đề sau sang tiếng Việt tự nhiên nhất, giữ lại các từ ngữ chuyên môn: '{title}'. Chỉ trả về tiêu đề đã dịch, không thêm lời dẫn."
+            prompt = f"Nhiệm vụ: Dịch tiêu đề sau sang tiếng Việt tự nhiên nhất. YÊU CẦU: CHỈ TRẢ VỀ KẾT QUẢ DỊCH, KHÔNG THÊM BẤT KỲ LỜI GIỚI THIỆU NÀO: '{title}'"
             response = self.client.generate(model=self.model, prompt=prompt)
             return response['response'].strip().replace('"', '')
         except Exception as e:
@@ -42,19 +42,21 @@ class AIService:
     async def translate_text(self, text: str) -> Optional[str]:
         """Dịch đoạn văn bản dài sang tiếng Việt chuyên sâu công nghệ"""
         try:
-            # Ưu tiên dịch những đoạn đầu quan trọng nếu text quá dài
             prompt = f"""
-            Nhiệm vụ: Dịch đoạn tin tức công nghệ sau sang tiếng Việt.
-            Yêu cầu:
-            1. Dịch trung thực, tự nhiên, chuẩn ngữ pháp tiếng Việt.
-            2. GIỮ NGUYÊN các từ khóa kỹ thuật.
-            3. TRẢ VỀ KẾT QUẢ RIÊNG BIỆT theo từng đoạn (giữ cấu trúc mảng nếu có thể).
-            
+            HÀNH ĐỘNG: Dịch đoạn văn bản sau sang tiếng Việt.
+            QUY TẮC: 
+            1. CHỈ TRẢ VỀ BẢN DỊCH. 
+            2. KHÔNG LẶP LẠI YÊU CẦU NÀY. 
+            3. KHÔNG THÊM LỜI DẪN.
+            4. Giữ nguyên thuật ngữ chuyên môn.
+
             Văn bản cần dịch:
             {text[:3000]}
             """
             response = self.client.generate(model=self.model, prompt=prompt)
-            return response['response'].strip()
+            # Loại bỏ sạch các dòng thừa nếu AI cố tình trả về
+            result = response['response'].strip()
+            return result
         except Exception as e:
             print(f"Error translating content: {e}")
             return text 
