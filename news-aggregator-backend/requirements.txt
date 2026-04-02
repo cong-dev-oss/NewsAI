@@ -11,5 +11,8 @@ beautifulsoup4
 celery
 redis
 python-multipart
-# Additional for AI or Task
 ollama
+celery-sqlalchemy-scheduler
+passlib[bcrypt]
+python-jose[cryptography]
+pytz

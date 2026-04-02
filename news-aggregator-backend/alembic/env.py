@@ -10,7 +10,10 @@ sys.path.append(os.getcwd())
 
 # Import models and Base
 from app.core.database import Base
-from app.domain.models.article import Article, Source, JobHistory
+from app.models.source import Source
+from app.models.topic import Topic
+from app.models.config import SourceTopicConfig
+from app.models.article_history import ArticleHistory
 from app.core.config import settings
 
 # this is the Alembic Config object, which provides access to the values within the .ini file in use.

@@ -1,12 +1,30 @@
 'use client';
-import { useState } from 'react';
-import { articles, categories } from '@/lib/mockData';
+import { useState, useEffect } from 'react';
+import { getArticles, getCategories } from '@/lib/api';
+import { Article } from '@/lib/mockData';
 import ArticleCard from '@/components/ArticleCard';
 
 export default function LatestPage() {
   const [activeCategory, setActiveCategory] = useState('Tất cả');
+  const [categories, setCategories] = useState<{name: string}[]>([]);
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getCategories().then(setCategories);
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    const catFilter = activeCategory === 'Tất cả' ? undefined : activeCategory;
+    getArticles(30, catFilter).then(data => {
+      setArticles(data);
+      setLoading(false);
+    });
+  }, [activeCategory]);
+
   const allCats = ['Tất cả', ...categories.map(c => c.name)];
-  const filtered = activeCategory === 'Tất cả' ? articles : articles.filter(a => a.category === activeCategory);
+  const filtered = articles;
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
@@ -36,12 +54,18 @@ export default function LatestPage() {
           <i className="ri-sort-desc"></i> Mới nhất
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-        {filtered.map(article => (
-          <ArticleCard key={article.id} article={article} />
-        ))}
-      </div>
-      {filtered.length === 0 && (
+      
+      {loading ? (
+        <div className="py-20 text-center text-gray-400">Đang tải bài viết...</div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          {filtered.map(article => (
+            <ArticleCard key={article.id} article={article} />
+          ))}
+        </div>
+      )}
+
+      {!loading && filtered.length === 0 && (
         <div className="text-center py-20 text-gray-400">
           <div className="w-12 h-12 flex items-center justify-center mx-auto mb-3">
             <i className="ri-article-line text-4xl"></i>

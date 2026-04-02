@@ -1,42 +1,58 @@
-from .celery_app import celery_app
-from celery.schedules import crontab
+from sqlalchemy.orm import Session
+from celery_sqlalchemy_scheduler.models import PeriodicTask, CrontabSchedule
+from app.models.config import SourceTopicConfig
+import json
 
-# Configure periodic tasks (Celery Beat)
-celery_app.conf.beat_schedule = {
-    # 10 bài Công nghệ từ Hacker News mỗi ngày (6:00 AM)
-    'crawl-tech-hacker-news': {
-        'task': 'crawl_hacker_news_tech_task',
-        'schedule': crontab(hour=6, minute=0),
-        'args': (10,),
-    },
-    # 5 bài Thế giới mỗi ngày (6:05 AM)
-    'crawl-world-news': {
-        'task': 'crawl_rss_category_task',
-        'schedule': crontab(hour=6, minute=5),
-        'args': ('https://vnexpress.net/rss/the-gioi.rss', 'Thế giới', 5),
-    },
-    # 5 bài Chính trị/Thời sự mỗi ngày (6:10 AM)
-    'crawl-politics-news': {
-        'task': 'crawl_rss_category_task',
-        'schedule': crontab(hour=6, minute=10),
-        'args': ('https://vnexpress.net/rss/thoi-su.rss', 'Chính trị', 5),
-    },
-    # 5 bài Kinh tế mỗi ngày (6:15 AM)
-    'crawl-economy-news': {
-        'task': 'crawl_rss_category_task',
-        'schedule': crontab(hour=6, minute=15),
-        'args': ('https://vnexpress.net/rss/kinh-doanh.rss', 'Kinh tế', 5),
-    },
-    # 5 bài Khoa học mỗi ngày (6:20 AM)
-    'crawl-science-news': {
-        'task': 'crawl_rss_category_task',
-        'schedule': crontab(hour=6, minute=20),
-        'args': ('https://vnexpress.net/rss/khoa-hoc.rss', 'Khoa học', 5),
-    },
-    # 5 bài Sức khỏe mỗi ngày (6:25 AM)
-    'crawl-health-news': {
-        'task': 'crawl_rss_category_task',
-        'schedule': crontab(hour=6, minute=25),
-        'args': ('https://vnexpress.net/rss/suc-khoe.rss', 'Sức khỏe', 5),
-    },
-}
+class SchedulerService:
+    @staticmethod
+    def sync_config_to_celery(db: Session, config: SourceTopicConfig):
+        """Đồng bộ cài đặt từ SourceTopicConfig sang bảng của Celery Beat"""
+        # Giả sử cron_config là "0 15 * * *"
+        parts = config.cron_config.split()
+        if len(parts) != 5:
+            print("Invalid cron format")
+            return
+
+        minute, hour, day_of_month, month_of_year, day_of_week = parts
+
+        # 1. Tìm hoặc tạo CrontabSchedule
+        schedule = db.query(CrontabSchedule).filter_by(
+            minute=minute,
+            hour=hour,
+            day_of_month=day_of_month,
+            month_of_year=month_of_year,
+            day_of_week=day_of_week,
+            timezone="Asia/Ho_Chi_Minh"
+        ).first()
+        
+        if not schedule:
+            schedule = CrontabSchedule(
+                minute=minute,
+                hour=hour,
+                day_of_month=day_of_month,
+                month_of_year=month_of_year,
+                day_of_week=day_of_week,
+                timezone="Asia/Ho_Chi_Minh"
+            )
+            db.add(schedule)
+            db.commit()
+            db.refresh(schedule)
+
+        # 2. Tạo hoặc cập nhật PeriodicTask
+        task_name = f"crawl_job_{config.id}"
+        periodic_task = db.query(PeriodicTask).filter_by(name=task_name).first()
+        
+        if not periodic_task:
+            periodic_task = PeriodicTask(
+                name=task_name,
+                task="app.worker.tasks.run_config_crawl",
+                crontab_id=schedule.id,
+                args=json.dumps([config.id]),
+                enabled=config.is_active
+            )
+            db.add(periodic_task)
+        else:
+            periodic_task.crontab_id = schedule.id
+            periodic_task.enabled = config.is_active
+            
+        db.commit()

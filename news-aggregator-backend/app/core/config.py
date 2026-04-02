@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
+import os
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "News AI Aggregator"
@@ -10,6 +11,10 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = "news_db"
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: str = "5432"
+    
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-key-69-420")
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7 # 1 week
     
     @property
     def DATABASE_URL(self) -> str:

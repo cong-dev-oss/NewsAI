@@ -83,6 +83,18 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
             </>
           )}
 
+          {/* Link to original source */}
+          <div className="mt-8 mb-4">
+            <a 
+              href={article.url} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
+            >
+              <i className="ri-external-link-line"></i> Xem bài viết gốc tại nguồn
+            </a>
+          </div>
+
           {article.tags && article.tags.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-10 pt-6 border-t border-gray-100">
               {article.tags.map(tag => (

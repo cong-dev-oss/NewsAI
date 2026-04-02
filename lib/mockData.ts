@@ -1,5 +1,6 @@
 export interface Article {
   id: string;
+  url: string; // Thêm url bài viết gốc
   title: string;
   excerpt: string;
   category: string;

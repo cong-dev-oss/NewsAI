@@ -1,5 +1,8 @@
 from app.core.database import engine, Base
-from app.domain.models.article import Article, Source, JobHistory
+from app.models.source import Source
+from app.models.topic import Topic
+from app.models.config import SourceTopicConfig
+from app.models.article_history import ArticleHistory
 
 def reset_database():
     print("⚠️  Đang tiến hành xoá toàn bộ dữ liệu cũ...")
