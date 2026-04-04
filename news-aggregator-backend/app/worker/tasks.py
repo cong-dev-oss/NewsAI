@@ -1,10 +1,16 @@
 from app.core.celery_app import celery_app
 from app.services.crawler_service import CrawlerService
 from app.services.ai_service import AIService
+from app.services.tts_service import TTSService
 from app.services.state_service import StateService
 from app.core.database import SessionLocal
 from app.models.config import SourceTopicConfig
 from app.models.article_history import ArticleHistory
+from app.models.user import User
+from app.models.source import Source
+from app.models.topic import Topic
+from app.models.article import Article, JobHistory
+from app.core.config import settings
 import time
 
 @celery_app.task(bind=True)
@@ -46,36 +52,130 @@ def run_config_crawl(self, config_id: int):
         db.close()
 
 
+from app.services.state_service import StateService
+
 @celery_app.task(bind=True)
 def process_single_article(self, history_id: int):
     """Nhiệm vụ chính: CRAWLING -> SUMMARIZING -> SAVING -> COMPLETED"""
-    StateService.update_article_state(history_id, "CRAWLING", 0.25)
-    
     db = SessionLocal()
     history = db.query(ArticleHistory).get(history_id)
     if not history:
-        return {"status": "failed", "error": "History record not found"}
+        db.close()
+        return {"status": "error", "message": "History not found"}
+    
     url = history.url
+    config_id = history.config_id
+    source_id = history.config.source_id
+    category_name = history.config.topic.name if history.config and history.config.topic else None
     db.close()
 
-    # Bước 1: Cào nội dung
-    raw_text = CrawlerService.crawl_article(url)
-    if not raw_text:
-        StateService.update_article_state(history_id, "FAILED", 0.0)
-        return {"status": "failed", "error": "Crawl failed"}
+    try:
+        # Step 1: Crawl (20%)
+        StateService.update_article_state(history_id, "CRAWLING", 0.20)
+        crawl_data = CrawlerService.crawl_article(url)
+        raw_text = crawl_data["content"]
+        article_title = crawl_data["title"] or "Untitled Article"
+        image_url = crawl_data["image_url"]
+
+        if not raw_text or len(raw_text) < 100:
+            StateService.update_article_state(history_id, "FAILED", 1.0, title=article_title)
+            return {"status": "failed", "message": "Content too short"}
+
+        # Step 2: Summarize (50%)
+        StateService.update_article_state(history_id, "SUMMARIZING", 0.50, title=article_title)
         
-    # Bước 2: Tóm tắt
-    StateService.update_article_state(history_id, "SUMMARIZING", 0.50)
-    summary = AIService.summarize(raw_text)
-    if not summary:
-        StateService.update_article_state(history_id, "FAILED", 0.0)
-        return {"status": "failed", "error": "AI summarize failed"}
+        summary = ""
+        max_retries = 2
+        for attempt in range(max_retries + 1):
+            try:
+                # AIService.summarize là hàm đồng bộ (sync), gọi trực tiếp
+                summary = AIService.summarize(raw_text)
+                if summary: break
+            except Exception as e:
+                print(f"Summarize attempt {attempt + 1}/{max_retries + 1} failed: {e}")
+                if attempt == max_retries: raise e
+                time.sleep(2)
+
+        if not summary:
+            summary = AIService.build_fallback_summary(raw_text)
+
+        # Step 3: Generate Audio from TTS (70%)
+        StateService.update_article_state(history_id, "GENERATING_AUDIO", 0.70, title=article_title)
+        audio_url = TTSService.generate_audio(summary)
+
+        # Step 4: Save to DB (90%)
+        StateService.update_article_state(history_id, "SAVING", 0.90, title=article_title)
         
-    # Bước 3: Lưu lại
-    StateService.update_article_state(history_id, "SAVING", 0.75)
-    # Chúng ta trích xuất tạm Title từ 100 ký tự đầu của raw_text hoặc để crawler làm kỹ hơn
-    title = raw_text[:100].strip().replace("\n", " ")
-    
-    StateService.update_article_state(history_id, "COMPLETED", 1.0, title=title, summary=summary)
-    
-    return {"status": "success", "id": history_id}
+        db = SessionLocal()
+        # Save the actual article
+        article = Article(
+            source_id=source_id,
+            title=article_title,
+            category=category_name,
+            content=raw_text,
+            summary=summary,
+            url=url,
+            image_url=image_url,
+            audio_url=audio_url,
+            is_processed=True,
+        )
+        db.add(article)
+        db.commit()
+        db.refresh(article)
+        db.close()
+
+        # Step 4: Complete (100%)
+        StateService.update_article_state(history_id, "COMPLETED", 1.0, title=article_title, summary=summary)
+        return {"status": "success", "article_id": article.id}
+
+    except Exception as e:
+        print(f"Error processing article {url}: {e}")
+        StateService.update_article_state(history_id, "FAILED", 1.0, title="Error Processing")
+        return {"status": "error", "message": str(e)}
+
+from app.services.research_service import ResearchService
+
+@celery_app.task(bind=True)
+def run_tech_research_task(self, topic: str):
+    """
+    Task chạy định kỳ (1 ngày 1 lần theo cấu hình)
+    để nghiên cứu và tổng hợp bài báo cáo công nghệ mới nhất.
+    """
+    db = SessionLocal()
+    try:
+        # Gọi tool Last30days-skill (qua ResearchService)
+        raw_report = ResearchService.run_last_30_days_research(topic)
+        
+        # Tóm tắt và tạo CSS
+        summary = AIService.summarize(raw_report)
+        audio_url = TTSService.generate_audio(summary)
+        
+        # Tìm source default hoặc source ID riêng cho phân mục Nghiên Cứu
+        source = db.query(Source).filter_by(name="Last30Days-Research").first()
+        if not source:
+            source = Source(name="Last30Days-Research", url=settings.LAST30DAYS_REPO_URL, selector_config="none")
+            db.add(source)
+            db.commit()
+            db.refresh(source)
+            
+        research_article = Article(
+            source_id=source.id,
+            title=f"Tech Summary: {topic}",
+            category="Tech Summary",
+            content=raw_report,
+            summary=summary,
+            audio_url=audio_url,
+            url=f"research://{topic.replace(' ', '-').lower()}-{int(time.time())}",
+            image_url="",
+            is_processed=True,
+        )
+        db.add(research_article)
+        db.commit()
+        db.refresh(research_article)
+        
+        return {"status": "success", "article_id": research_article.id}
+    except Exception as e:
+        print(f"Error running tech research task: {e}")
+        return {"status": "error", "message": str(e)}
+    finally:
+        db.close()

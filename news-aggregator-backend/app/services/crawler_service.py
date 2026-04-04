@@ -1,55 +1,79 @@
 import httpx
 from bs4 import BeautifulSoup
 from typing import List, Dict
+from app.core.config import settings
 
 class CrawlerService:
     @staticmethod
-    def crawl_article(url: str) -> str:
+    def crawl_article(url: str) -> dict:
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            "User-Agent": settings.DEFAULT_USER_AGENT
         }
         try:
             response = httpx.get(url, headers=headers, timeout=10.0, follow_redirects=True)
             if response.status_code != 200:
-                print(f"Failed to fetch {url}: {response.status_code}")
-                return ""
+                return {"title": "", "content": "", "image_url": ""}
                 
             soup = BeautifulSoup(response.text, "html.parser")
             
-            # Simple heuristic to get article text - adjust for specific sites if needed
-            # For VNExpress: article_content, description, title
-            paragraphs = soup.find_all(['p', 'span'])
+            # 1. Trích xuất Title (VNE: title.title-detail)
+            title = soup.find('h1', class_='title-detail')
+            if not title: title = soup.find('h1')
+            title_text = title.get_text().strip() if title else ""
             
+            # 2. Trích xuất Image (VNE: meta property="og:image")
+            image = soup.find('meta', property='og:image')
+            image_url = image['content'] if image else ""
+
+            # 3. Trích xuất Content
+            paragraphs = soup.find_all(['p', 'span'])
             text_lines = []
             for p in paragraphs:
                 text = p.get_text().strip()
-                if len(text) > 50: # Avoid small meta bits
+                if len(text) > 80: # Loại bỏ các đoạn rác nhỏ
                     text_lines.append(text)
             
-            return "\n".join(text_lines)
+            return {
+                "title": title_text,
+                "content": "\n".join(text_lines),
+                "image_url": image_url
+            }
             
         except Exception as e:
             print(f"Error crawling {url}: {e}")
-            return ""
+            return {"title": "", "content": "", "image_url": ""}
 
     @staticmethod
     def get_links_from_category(category_url: str, limit: int = 5) -> List[str]:
-        # This function should be more specific per site, but for now a generic one
-        headers = {"User-Agent": "Mozilla/5.0"}
+        headers = {
+            "User-Agent": settings.DEFAULT_USER_AGENT
+        }
+        links = []
         try:
+            print(f"Crawl links from category: {category_url}")
             response = httpx.get(category_url, headers=headers, timeout=10.0, follow_redirects=True)
+            if response.status_code != 200:
+                print(f"Failed to fetch category {category_url}: {response.status_code}")
+                return []
+                
             soup = BeautifulSoup(response.text, "html.parser")
-            
-            links = []
-            # VNE example links are often in h3 > a
             for a in soup.find_all('a', href=True):
                 href = a['href']
-                if href.startswith('http') and ('.html' in href or 'vnexpress.net' in href):
+                # Support both absolute and relative urls
+                if href.startswith('/'):
+                    href = "https://vnexpress.net" + href
+                
+                # Check for common VnExpress article patterns
+                if 'vnexpress.net' in href and '.html' in href and len(href) > 40:
                     if href not in links:
                         links.append(href)
+                        print(f" Found article: {href}")
+                
                 if len(links) >= limit:
                     break
+            
+            print(f"Total links found: {len(links)}")
             return links
         except Exception as e:
-            print(f"Error getting links from {category_url}: {e}")
+            print(f"Error fetching links from {category_url}: {e}")
             return []

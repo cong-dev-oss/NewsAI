@@ -14,6 +14,7 @@ export interface Article {
   tags?: string[];
   summary?: string;
   content?: string;
+  audio_url?: string;
 }
 
 export const categories = [

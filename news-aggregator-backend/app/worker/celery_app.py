@@ -20,3 +20,14 @@ celery_app.conf.update(
     # As requested: Only 1 task per worker for AI processing
     worker_concurrency=1,
 )
+
+from celery.schedules import crontab
+
+# Cấu hình tự động chay task (tuỳ chọn) khi khởi động celery beat
+celery_app.conf.beat_schedule = {
+    'daily-tech-research-task': {
+        'task': 'app.worker.tasks.run_tech_research_task',
+        'schedule': crontab(minute=0, hour=0), # 1 ngày 1 lần (0h00)
+        'args': ('Trending in Software Engineering',),
+    },
+}

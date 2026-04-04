@@ -1,10 +1,8 @@
 import Link from 'next/link';
-import { articles as mockArticles } from '@/lib/mockData';
 import { getArticles } from '@/lib/api';
 
 export default async function HomeHero() {
-  const realArticles = await getArticles(4);
-  const data = realArticles.length > 0 ? realArticles : mockArticles;
+  const data = await getArticles(4);
   
   if (data.length === 0) {
     return (

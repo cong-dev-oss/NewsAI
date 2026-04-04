@@ -32,6 +32,17 @@ class Settings(BaseSettings):
         return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/0"
     
     OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "qwen2.5:3b"
+    OLLAMA_TIMEOUT_SECONDS: float = 240.0
+    OLLAMA_PROMPT_MAX_CHARS: int = 1200
+    OLLAMA_NUM_PREDICT: int = 80
+    OLLAMA_TEMPERATURE: float = 0.1
+    OLLAMA_KEEP_ALIVE: str = "10m"
+    
+    # External Services
+    VOID_BOX_URL: str = "http://192.168.119.128:8000/tts"
+    LAST30DAYS_REPO_URL: str = "https://github.com/mvanhorn/last30days-skill"
+    DEFAULT_USER_AGENT: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     
     class Config:
         case_sensitive = True

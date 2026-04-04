@@ -12,6 +12,12 @@ export default function DashboardPage() {
   const [history, setHistory] = useState<any[]>([]);
   const [activeTasks, setActiveTasks] = useState<Record<number, any>>({});
   const [loading, setLoading] = useState(true);
+  const [triggering, setTriggering] = useState(false);
+
+  const completedCount = history.filter((item) => item.status === "COMPLETED").length;
+  const failedCount = history.filter((item) => item.status === "FAILED").length;
+  const finishedCount = completedCount + failedCount;
+  const successRate = finishedCount === 0 ? 0 : (completedCount / finishedCount) * 100;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -32,12 +38,19 @@ export default function DashboardPage() {
 
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      setActiveTasks(prev => ({
-        ...prev,
-        [data.id]: data
-      }));
+      setActiveTasks(prev => {
+        const next = { ...prev };
 
-      if (data.status === 'COMPLETED') {
+        if (data.status === "COMPLETED" || data.status === "FAILED") {
+          delete next[data.id];
+          return next;
+        }
+
+        next[data.id] = data;
+        return next;
+      });
+
+      if (data.status === 'COMPLETED' || data.status === 'FAILED') {
         setTimeout(() => {
           api.getHistory().then(setHistory);
         }, 3000);
@@ -46,6 +59,17 @@ export default function DashboardPage() {
 
     return () => socket.close();
   }, []);
+
+  const handleTriggerScan = async () => {
+    setTriggering(true);
+    try {
+      await api.triggerAll();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setTriggering(false);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -62,9 +86,13 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold tracking-tight text-zinc-900">Dashboard</h1>
           <p className="text-zinc-500 mt-1">Real-time system monitoring and processing history.</p>
         </div>
-        <button className="bg-zinc-900 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-zinc-800 transition flex items-center gap-2">
-            <Play size={14} fill="currentColor" />
-            Trigger Scan
+        <button 
+            disabled={triggering}
+            onClick={handleTriggerScan}
+            className="bg-zinc-900 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
+        >
+            {triggering ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} fill="currentColor" />}
+            {triggering ? "Processing..." : "Trigger Scan"}
         </button>
       </div>
 
@@ -81,14 +109,14 @@ export default function DashboardPage() {
                 <span className="text-sm font-medium text-zinc-500">Total Processed</span>
                 <CheckCircle2 size={16} className="text-zinc-400" />
             </div>
-            <p className="text-2xl font-bold">{history.length}</p>
+            <p className="text-2xl font-bold">{finishedCount}</p>
         </div>
         <div className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-zinc-500">Success Rate</span>
                 <History size={16} className="text-zinc-400" />
             </div>
-            <p className="text-2xl font-bold">98.2%</p>
+            <p className="text-2xl font-bold">{successRate.toFixed(1)}%</p>
         </div>
       </div>
 

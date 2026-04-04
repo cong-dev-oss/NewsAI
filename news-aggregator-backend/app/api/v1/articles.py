@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database import get_db
-from app.domain.schemas.article import ArticleRead, ArticleCreate, ArticleUpdate, ArticleList
+from app.domain.schemas.article import ArticleRead, ArticleCreate, ArticleUpdate, ArticleList, ArticleBulkDeleteRequest
 # from app.services.article_service import ArticleService # We will create this later
 
 router = APIRouter()
@@ -17,7 +17,7 @@ def read_articles(
 ):
     # Mock for Phase 1 or simple DB query
     from app.domain.models.article import Article
-    query = db.query(Article)
+    query = db.query(Article).order_by(Article.processed_at.desc(), Article.id.desc())
     if is_processed is not None:
         query = query.filter(Article.is_processed == is_processed)
     if category is not None:
@@ -59,3 +59,31 @@ def read_article(article_id: int, db: Session = Depends(get_db)):
     if article is None:
         raise HTTPException(status_code=404, detail="Article not found")
     return article
+
+@router.delete("/{article_id}")
+def delete_article(article_id: int, db: Session = Depends(get_db)):
+    from app.domain.models.article import Article
+    article = db.query(Article).filter(Article.id == article_id).first()
+    if article is None:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    db.delete(article)
+    db.commit()
+    return {"status": "success", "deleted_ids": [article_id], "deleted_count": 1}
+
+@router.post("/bulk-delete")
+def bulk_delete_articles(payload: ArticleBulkDeleteRequest, db: Session = Depends(get_db)):
+    from app.domain.models.article import Article
+
+    ids = sorted(set(payload.ids))
+    if not ids:
+        return {"status": "success", "deleted_ids": [], "deleted_count": 0}
+
+    articles = db.query(Article).filter(Article.id.in_(ids)).all()
+    found_ids = [article.id for article in articles]
+
+    for article in articles:
+        db.delete(article)
+
+    db.commit()
+    return {"status": "success", "deleted_ids": found_ids, "deleted_count": len(found_ids)}

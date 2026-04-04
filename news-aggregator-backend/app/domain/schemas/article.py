@@ -52,3 +52,6 @@ class ArticleRead(ArticleBase):
 class ArticleList(BaseModel):
     items: List[ArticleRead]
     total: int
+
+class ArticleBulkDeleteRequest(BaseModel):
+    ids: List[int]

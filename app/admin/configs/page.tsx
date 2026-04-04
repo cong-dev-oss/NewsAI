@@ -1,15 +1,16 @@
 "use client"
 import React, { useState, useEffect } from "react";
 import { api } from "@/lib/api";
+import AlertDialog from "@/components/ui/alert-dialog";
 import { 
   Plus, Settings, 
-  Trash2, Save, 
+  Trash2, 
   Globe, Tags, 
   CalendarClock,
-  MoreVertical, ChevronRight,
+  ChevronDown,
+  ChevronRight,
   Database,
   ArrowRightLeft,
-  Activity,
   PlusCircle
 } from "lucide-react";
 
@@ -18,6 +19,15 @@ export default function ConfigsPage() {
   const [topics, setTopics] = useState<any[]>([]);
   const [configs, setConfigs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingConfigId, setEditingConfigId] = useState<number | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogLoading, setDialogLoading] = useState(false);
+  const [dialogTitle, setDialogTitle] = useState("");
+  const [dialogDescription, setDialogDescription] = useState("");
+  const [dialogConfirmLabel, setDialogConfirmLabel] = useState("Tiếp tục");
+  const [dialogShowCancel, setDialogShowCancel] = useState(true);
+  const [dialogVariant, setDialogVariant] = useState<"default" | "destructive">("default");
+  const [dialogAction, setDialogAction] = useState<null | (() => Promise<void> | void)>(null);
 
   // Form states
   const [newSource, setNewSource] = useState({ name: "", base_url: "" });
@@ -31,6 +41,12 @@ export default function ConfigsPage() {
   });
 
   const [showConfigForm, setShowConfigForm] = useState(false);
+
+  const resetConfigForm = () => {
+    setNewConfig({ source_id: "", topic_id: "", url: "", cron_config: "0 15 * * *", article_limit: 5 });
+    setEditingConfigId(null);
+    setShowConfigForm(false);
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -67,15 +83,83 @@ export default function ConfigsPage() {
 
   const handleCreateConfig = async (e: React.FormEvent) => {
     e.preventDefault();
-    await api.createConfig({
-        ...newConfig,
-        source_id: parseInt(newConfig.source_id),
-        topic_id: parseInt(newConfig.topic_id),
-        article_limit: parseInt(newConfig.article_limit.toString())
-    });
+    const payload = {
+      ...newConfig,
+      source_id: parseInt(newConfig.source_id),
+      topic_id: parseInt(newConfig.topic_id),
+      article_limit: parseInt(newConfig.article_limit.toString())
+    };
+
+    if (editingConfigId) {
+      await api.updateConfig(editingConfigId, payload);
+    } else {
+      await api.createConfig(payload);
+    }
+
     setConfigs(await api.getConfigs());
-    setNewConfig({ source_id: "", topic_id: "", url: "", cron_config: "0 15 * * *", article_limit: 5 });
-    setShowConfigForm(false);
+    resetConfigForm();
+  };
+
+  const handleEditConfig = (config: any) => {
+    setEditingConfigId(config.id);
+    setNewConfig({
+      source_id: config.source_id.toString(),
+      topic_id: config.topic_id.toString(),
+      url: config.url,
+      cron_config: config.cron_config,
+      article_limit: config.article_limit
+    });
+    setShowConfigForm(true);
+  };
+
+  const openConfirmDialog = ({
+    title,
+    description,
+    confirmLabel,
+    variant = "default",
+    showCancel = true,
+    action,
+  }: {
+    title: string;
+    description: string;
+    confirmLabel: string;
+    variant?: "default" | "destructive";
+    showCancel?: boolean;
+    action: () => Promise<void> | void;
+  }) => {
+    setDialogTitle(title);
+    setDialogDescription(description);
+    setDialogConfirmLabel(confirmLabel);
+    setDialogVariant(variant);
+    setDialogShowCancel(showCancel);
+    setDialogAction(() => action);
+    setDialogOpen(true);
+  };
+
+  const handleDeleteTopic = (topic: any) => {
+    openConfirmDialog({
+      title: `Xóa segment "${topic.name}"?`,
+      description: "Segment sẽ bị xóa khỏi registry. Nếu đang được dùng bởi pipeline, hệ thống sẽ chặn thao tác để tránh làm hỏng cấu hình.",
+      confirmLabel: "Xóa segment",
+      variant: "destructive",
+      action: async () => {
+        setDialogLoading(true);
+        try {
+          await api.deleteTopic(topic.id);
+          setTopics(await api.getTopics());
+          setDialogOpen(false);
+        } catch (e: any) {
+          setDialogTitle("Không thể xóa segment");
+          setDialogDescription(e.message || "Segment này đang được sử dụng hoặc đã phát sinh lỗi.");
+          setDialogConfirmLabel("Đã hiểu");
+          setDialogVariant("default");
+          setDialogShowCancel(false);
+          setDialogAction(() => () => setDialogOpen(false));
+        } finally {
+          setDialogLoading(false);
+        }
+      },
+    });
   };
 
   return (
@@ -153,9 +237,17 @@ export default function ConfigsPage() {
                 <h4 className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">Active Segments</h4>
                 <div className="flex flex-wrap gap-1.5">
                   {topics.map(t => (
-                    <span key={t.id} className="bg-zinc-900 text-white px-2.5 py-1 rounded-lg text-[11px] font-bold shadow-sm">
-                      {t.name}
-                    </span>
+                    <div key={t.id} className="group inline-flex items-center gap-1 rounded-lg bg-zinc-900 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
+                      <span>{t.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTopic(t)}
+                        className="rounded-sm p-0.5 text-zinc-400 opacity-0 transition hover:bg-zinc-800 hover:text-white group-hover:opacity-100"
+                        title="Xóa nhanh segment"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -169,7 +261,15 @@ export default function ConfigsPage() {
                     <ArrowRightLeft size={14} /> Automation Pipelines
                 </h2>
                 <button 
-                    onClick={() => setShowConfigForm(!showConfigForm)}
+                    onClick={() => {
+                      if (showConfigForm && !editingConfigId) {
+                        setShowConfigForm(false);
+                      } else if (editingConfigId) {
+                        resetConfigForm();
+                      } else {
+                        setShowConfigForm(true);
+                      }
+                    }}
                     className="flex items-center gap-1.5 text-xs font-bold text-zinc-900 bg-white border border-zinc-200 px-3 py-1.5 rounded-lg hover:bg-zinc-50 transition shadow-sm"
                 >
                     {showConfigForm ? "Cancel" : <><Plus size={14} /> New Pipeline</>}
@@ -178,26 +278,53 @@ export default function ConfigsPage() {
 
              {showConfigForm && (
                 <form onSubmit={handleCreateConfig} className="bg-zinc-900 text-white p-8 rounded-2xl space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                            <h3 className="text-lg font-semibold">
+                                {editingConfigId ? `Edit Pipeline #${editingConfigId}` : "Create Pipeline"}
+                            </h3>
+                            <p className="text-sm text-zinc-400">
+                                {editingConfigId ? "Cập nhật nguồn, chủ đề, lịch chạy và giới hạn bài viết." : "Tạo pipeline crawl mới cho hệ thống."}
+                            </p>
+                        </div>
+                        {editingConfigId && (
+                            <button
+                                type="button"
+                                onClick={resetConfigForm}
+                                className="rounded-lg border border-zinc-700 px-3 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-800"
+                            >
+                                Hủy sửa
+                            </button>
+                        )}
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-bold uppercase tracking-widest opacity-60">Source Agency</label>
-                            <select 
-                                className="w-full bg-zinc-800 border-none p-3 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-zinc-700 transition"
-                                value={newConfig.source_id} onChange={e => setNewConfig({...newConfig, source_id: e.target.value})}
-                            >
-                                <option value="">-- Choose --</option>
-                                {sources.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                            </select>
+                            <div className="relative">
+                                <select 
+                                    className="h-11 w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-800 px-3 pr-10 text-sm font-medium text-white outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-600/40"
+                                    value={newConfig.source_id}
+                                    onChange={e => setNewConfig({...newConfig, source_id: e.target.value})}
+                                >
+                                    <option value="" className="text-zinc-400">-- Choose --</option>
+                                    {sources.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                                <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                            </div>
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-bold uppercase tracking-widest opacity-60">Topic Category</label>
-                            <select 
-                                className="w-full bg-zinc-800 border-none p-3 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-zinc-700 transition"
-                                value={newConfig.topic_id} onChange={e => setNewConfig({...newConfig, topic_id: e.target.value})}
-                            >
-                                <option value="">-- Choose --</option>
-                                {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                            </select>
+                            <div className="relative">
+                                <select 
+                                    className="h-11 w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-800 px-3 pr-10 text-sm font-medium text-white outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-600/40"
+                                    value={newConfig.topic_id}
+                                    onChange={e => setNewConfig({...newConfig, topic_id: e.target.value})}
+                                >
+                                    <option value="" className="text-zinc-400">-- Choose --</option>
+                                    {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                </select>
+                                <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                            </div>
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-bold uppercase tracking-widest opacity-60">Batch Article Limit</label>
@@ -225,7 +352,7 @@ export default function ConfigsPage() {
                         </div>
                     </div>
                     <button type="submit" className="w-full bg-white text-zinc-900 p-3 rounded-xl hover:bg-zinc-100 font-bold transition text-sm shadow-xl shadow-white/5">
-                        Create Pipeline Instance
+                        {editingConfigId ? "Save Pipeline Changes" : "Create Pipeline Instance"}
                     </button>
                 </form>
              )}
@@ -263,7 +390,13 @@ export default function ConfigsPage() {
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                     <div className="flex justify-end gap-2">
-                                        <button className="p-2 text-zinc-300 hover:text-zinc-900 transition-colors"><Settings size={16} /></button>
+                                        <button
+                                            onClick={() => handleEditConfig(c)}
+                                            className="p-2 text-zinc-300 hover:text-zinc-900 transition-colors"
+                                            title="Sửa pipeline"
+                                        >
+                                            <Settings size={16} />
+                                        </button>
                                         <button className="p-2 text-zinc-300 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
                                     </div>
                                 </td>
@@ -275,6 +408,23 @@ export default function ConfigsPage() {
           </div>
         </div>
       </div>
+      <AlertDialog
+        open={dialogOpen}
+        title={dialogTitle}
+        description={dialogDescription}
+        confirmLabel={dialogConfirmLabel}
+        variant={dialogVariant}
+        loading={dialogLoading}
+        showCancel={dialogShowCancel}
+        onOpenChange={setDialogOpen}
+        onConfirm={async () => {
+          if (!dialogAction) {
+            setDialogOpen(false);
+            return;
+          }
+          await dialogAction();
+        }}
+      />
     </div>
   );
 }

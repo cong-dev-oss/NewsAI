@@ -15,6 +15,14 @@ class SourceTopicConfigBase(BaseModel):
 class SourceTopicConfigCreate(SourceTopicConfigBase):
     pass
 
+class SourceTopicConfigUpdate(BaseModel):
+    source_id: Optional[int] = None
+    topic_id: Optional[int] = None
+    url: Optional[str] = None
+    cron_config: Optional[str] = None
+    article_limit: Optional[int] = None
+    is_active: Optional[bool] = None
+
 class SourceTopicConfig(SourceTopicConfigBase):
     id: int
     source: Source

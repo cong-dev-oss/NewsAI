@@ -1,11 +1,9 @@
 import ArticleCard from '@/components/ArticleCard';
-import { articles as mockArticles } from '@/lib/mockData';
 import { getArticles } from '@/lib/api';
 import Link from 'next/link';
 
 export default async function HomeGrid() {
-  const realArticles = await getArticles(10);
-  const data = realArticles.length > 0 ? realArticles : mockArticles;
+  const data = await getArticles(10);
 
   if (data.length <= 4) return null; // Ẩn grid nếu không có bài mới hơn top 4
 

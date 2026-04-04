@@ -19,6 +19,7 @@ class Article(Base):
     summary = Column(Text, nullable=True)
     url = Column(String(512), nullable=False, unique=True)
     image_url = Column(String(512), nullable=True)
+    audio_url = Column(String(512), nullable=True) # Mới: URL âm thanh TTS
     published_at = Column(DateTime, nullable=True)
     processed_at = Column(DateTime, server_default=func.now())
     is_processed = Column(Boolean, default=False)

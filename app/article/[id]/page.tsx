@@ -1,14 +1,10 @@
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { articles as mockArticles } from '@/lib/mockData';
 import { getArticleById, getArticles } from '@/lib/api';
 import Link from 'next/link';
 
 export async function generateStaticParams() {
   const latestArticles = await getArticles(100);
-  if (latestArticles.length === 0) {
-    return mockArticles.map(a => ({ id: a.id }));
-  }
   return latestArticles.map(a => ({ id: a.id }));
 }
 
@@ -32,7 +28,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
   }
 
   const article = realArticle;
-  const related = mockArticles.filter(a => a.category === article.category && a.id !== article.id).slice(0, 3);
+  const related: any[] = []; // Currently no related API, so leaving as empty
 
   return (
     <div className="min-h-screen bg-white">
@@ -62,6 +58,14 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
             <p className="text-gray-700 text-base italic leading-relaxed">
               "{article.summary}"
             </p>
+            {article.audio_url && (
+              <div className="mt-4 pt-4 border-t border-blue-100">
+                <h5 className="text-xs text-blue-600 mb-2 font-semibold">Nghe bản tóm tắt:</h5>
+                <audio controls className="w-full h-10 outline-none" src={article.audio_url}>
+                  Trình duyệt của bạn không hỗ trợ thẻ audio.
+                </audio>
+              </div>
+            )}
           </div>
         )}
 

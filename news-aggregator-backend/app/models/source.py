@@ -11,3 +11,4 @@ class Source(Base):
     is_active = Column(Boolean, default=True)
 
     configs = relationship("SourceTopicConfig", back_populates="source")
+    articles = relationship("Article", back_populates="source")

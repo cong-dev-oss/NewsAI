@@ -1,9 +1,14 @@
+import sys
+import os
+sys.path.append(os.getcwd())
+
 from app.core.database import SessionLocal, engine, Base
 from app.models.user import User
 from app.models.source import Source
 from app.models.topic import Topic
 from app.models.config import SourceTopicConfig
 from app.models.article_history import ArticleHistory
+from app.domain.models.article import Article, JobHistory
 from celery_sqlalchemy_scheduler.models import CrontabSchedule, PeriodicTask
 
 def seed_admin():
