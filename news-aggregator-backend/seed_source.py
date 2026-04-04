@@ -1,5 +1,10 @@
 from app.core.database import SessionLocal
-from app.domain.models.article import Source
+from app.models.source import Source
+from app.models.topic import Topic
+from app.models.config import SourceTopicConfig
+from app.models.article import Article, JobHistory
+from app.models.article_history import ArticleHistory
+from app.models.user import User
 
 db = SessionLocal()
 try:

@@ -11,7 +11,6 @@ beautifulsoup4
 celery
 redis
 python-multipart
-ollama
 celery-sqlalchemy-scheduler
 passlib[bcrypt]
 python-jose[cryptography]

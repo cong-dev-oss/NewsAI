@@ -11,7 +11,7 @@ from app.models.topic import Topic
 from app.models.config import SourceTopicConfig
 from app.models.article_history import ArticleHistory
 # Quan trọng: Import thêm các model từ domain
-from app.domain.models.article import Article, JobHistory
+from app.models.article import Article, JobHistory
 
 def reset_database():
     print("⚠️  Đang tiến hành xoá toàn bộ dữ liệu cũ...")

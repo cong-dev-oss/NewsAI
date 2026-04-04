@@ -10,7 +10,7 @@ from app.models.source import Source
 from app.models.topic import Topic
 from app.models.config import SourceTopicConfig
 from app.models.article_history import ArticleHistory
-from app.domain.models.article import Article, JobHistory
+from app.models.article import Article, JobHistory
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

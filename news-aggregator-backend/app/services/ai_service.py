@@ -8,15 +8,15 @@ class AIService:
     def _prepare_prompt_text(text: str) -> str:
         paragraphs = [part.strip() for part in text.splitlines() if part.strip()]
         if not paragraphs:
-            return text[:settings.OLLAMA_PROMPT_MAX_CHARS]
+            return text[:settings.OPENAI_PROMPT_MAX_CHARS]
 
         # Ưu tiên đoạn mở đầu vì tin báo thường chứa ý chính ở phần đầu bài.
         compact_parts = []
         total_len = 0
         for paragraph in paragraphs:
             next_len = total_len + len(paragraph) + (1 if compact_parts else 0)
-            if next_len > settings.OLLAMA_PROMPT_MAX_CHARS:
-                remaining = settings.OLLAMA_PROMPT_MAX_CHARS - total_len
+            if next_len > settings.OPENAI_PROMPT_MAX_CHARS:
+                remaining = settings.OPENAI_PROMPT_MAX_CHARS - total_len
                 if remaining > 80:
                     compact_parts.append(paragraph[:remaining].strip())
                 break
@@ -45,45 +45,59 @@ class AIService:
         if not text:
             return ""
 
-        system_prompt = "Tóm tắt bài báo bằng tiếng Việt, đúng 3 câu ngắn, không mở đầu."
+        if not settings.OPENAI_API_KEY:
+            raise RuntimeError("Missing OPENAI_API_KEY for AIService")
+
+        system_prompt = "Ban la tro ly tom tat tin tuc. Hay tom tat bai bao bang tieng Viet, dung 3 cau ngan, ro rang, khong mo dau, khong them tieu de."
 
         prompt_text = AIService._prepare_prompt_text(text)
-        
-        url = f"{settings.OLLAMA_BASE_URL}/api/generate"
-        
+        url = f"{settings.OPENAI_BASE_URL}/chat/completions"
+
         payload = {
-            "model": settings.OLLAMA_MODEL,
-            "prompt": prompt_text,
-            "system": system_prompt,
-            "stream": False,
-            "options": {
-                "temperature": settings.OLLAMA_TEMPERATURE,
-                "num_predict": settings.OLLAMA_NUM_PREDICT
-            },
-            "keep_alive": settings.OLLAMA_KEEP_ALIVE
+            "model": settings.OPENAI_MODEL,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt_text},
+            ],
+            "temperature": settings.OPENAI_TEMPERATURE,
+            "max_completion_tokens": settings.OPENAI_MAX_COMPLETION_TOKENS,
         }
-        
+
         timeout = httpx.Timeout(
             connect=10.0,
             write=30.0,
-            read=settings.OLLAMA_TIMEOUT_SECONDS,
+            read=settings.OPENAI_TIMEOUT_SECONDS,
             pool=10.0,
         )
 
         try:
             start_time = time.perf_counter()
-            response = httpx.post(url, json=payload, timeout=timeout)
+            response = httpx.post(
+                url,
+                json=payload,
+                timeout=timeout,
+                headers={
+                    "Authorization": f"Bearer {settings.OPENAI_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+            )
             elapsed = time.perf_counter() - start_time
             if response.status_code == 200:
-                return response.json().get("response", "").strip()
+                data = response.json()
+                choices = data.get("choices") or []
+                if not choices:
+                    return ""
+
+                message = choices[0].get("message") or {}
+                return (message.get("content") or "").strip()
             else:
                 raise RuntimeError(
-                    f"Ollama error {response.status_code} after {elapsed:.2f}s: {response.text[:300]}"
+                    f"OpenAI error {response.status_code} after {elapsed:.2f}s: {response.text[:300]}"
                 )
         except httpx.TimeoutException as e:
             raise RuntimeError(
-                f"AIService timeout after {settings.OLLAMA_TIMEOUT_SECONDS:.0f}s "
-                f"(model={settings.OLLAMA_MODEL}, prompt_chars={len(prompt_text)})"
+                f"AIService timeout after {settings.OPENAI_TIMEOUT_SECONDS:.0f}s "
+                f"(model={settings.OPENAI_MODEL}, prompt_chars={len(prompt_text)})"
             ) from e
         except httpx.HTTPError as e:
             raise RuntimeError(f"AIService HTTP error: {e}") from e

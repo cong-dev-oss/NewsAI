@@ -30,7 +30,8 @@ services:
     environment:
       - POSTGRES_HOST=db
       - REDIS_HOST=redis
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
     depends_on:
       - db
       - redis
@@ -46,7 +47,8 @@ services:
     environment:
       - POSTGRES_HOST=db
       - REDIS_HOST=redis
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
     depends_on:
       - db
       - redis

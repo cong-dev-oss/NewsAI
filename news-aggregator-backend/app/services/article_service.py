@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.domain.models.article import Article
+from app.models.article import Article
 from app.domain.schemas.article import ArticleCreate, ArticleUpdate
 from typing import List, Optional
 

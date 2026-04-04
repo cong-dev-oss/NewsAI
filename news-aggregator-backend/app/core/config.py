@@ -31,13 +31,13 @@ class Settings(BaseSettings):
     def CELERY_RESULT_BACKEND(self) -> str:
         return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/0"
     
-    OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "qwen2.5:3b"
-    OLLAMA_TIMEOUT_SECONDS: float = 240.0
-    OLLAMA_PROMPT_MAX_CHARS: int = 1200
-    OLLAMA_NUM_PREDICT: int = 80
-    OLLAMA_TEMPERATURE: float = 0.1
-    OLLAMA_KEEP_ALIVE: str = "10m"
+    OPENAI_API_KEY: str = ""
+    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_TIMEOUT_SECONDS: float = 90.0
+    OPENAI_PROMPT_MAX_CHARS: int = 1200
+    OPENAI_MAX_COMPLETION_TOKENS: int = 120
+    OPENAI_TEMPERATURE: float = 0.1
     
     # External Services
     VOID_BOX_URL: str = "http://192.168.119.128:8000/tts"

@@ -3,18 +3,19 @@ import os
 sys.path.append(os.getcwd())
 
 from app.core.database import SessionLocal, engine, Base
+from sqlalchemy import inspect
 from app.models.user import User
 from app.models.source import Source
 from app.models.topic import Topic
 from app.models.config import SourceTopicConfig
 from app.models.article_history import ArticleHistory
-from app.domain.models.article import Article, JobHistory
-from celery_sqlalchemy_scheduler.models import CrontabSchedule, PeriodicTask
+from app.models.article import Article, JobHistory
 
 def seed_admin():
-    # Tự động tạo các bảng nếu chưa có
-    print("🛠️ Đang khởi tạo cấu trúc bảng...")
-    Base.metadata.create_all(bind=engine)
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        print("🛠️ Đang khởi tạo cấu trúc bảng...")
+        Base.metadata.create_all(bind=engine)
     
     db = SessionLocal()
     try:
