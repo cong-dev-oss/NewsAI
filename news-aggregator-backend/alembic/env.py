@@ -10,11 +10,17 @@ sys.path.append(os.getcwd())
 
 # Import models and Base
 from app.core.database import Base
-from app.models.source import Source
-from app.models.topic import Topic
-from app.models.config import SourceTopicConfig
-from app.models.article_history import ArticleHistory
 from app.core.config import settings
+from app.models.user import User
+from app.models.topic import Topic
+from app.models.signal_source import SignalSource
+from app.models.topic_source_config import TopicSourceConfig
+from app.models.research_run import ResearchRun
+from app.models.signal_item import SignalItem
+from app.models.story import Story
+from app.models.story_evidence import StoryEvidence
+from app.models.editorial_note import EditorialNote
+from app.models.article import JobHistory
 
 # this is the Alembic Config object, which provides access to the values within the .ini file in use.
 config = context.config

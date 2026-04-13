@@ -18,6 +18,9 @@ export default async function HomeHero() {
 
   return (
     <section className="max-w-6xl mx-auto px-6 pt-10 pb-2">
+      <div className="mb-6 flex items-center justify-between border-b border-gray-200 pb-4">
+        <h2 className="text-base font-bold uppercase tracking-widest text-gray-900">Spotlight</h2>
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
         <Link href={`/article/${hero.id}`} className="lg:col-span-3 group cursor-pointer block">
           <div className="w-full h-72 lg:h-96 overflow-hidden rounded-sm mb-5">

@@ -45,3 +45,54 @@ class ArticleHistory(ArticleHistoryBase):
 
     class Config:
         from_attributes = True
+
+
+class TopicSourceConfigBase(BaseModel):
+    topic_id: int
+    source_type: str
+    signal_source_id: Optional[int] = None
+    is_active: bool = True
+    fetch_limit: int = 20
+    pick_limit: int = 8
+    story_roundup_enabled: bool = True
+    story_deep_dive_enabled: bool = True
+    roundup_count: int = 1
+    deep_dive_count: int = 1
+    schedule_cron: str = "0 2 * * *"
+    priority_weight: int = 100
+    country: Optional[str] = None
+    language: Optional[str] = None
+    category: Optional[str] = None
+    extra_params: Optional[dict] = None
+
+
+class TopicSourceConfigCreate(TopicSourceConfigBase):
+    pass
+
+
+class TopicSourceConfigUpdate(BaseModel):
+    topic_id: Optional[int] = None
+    source_type: Optional[str] = None
+    signal_source_id: Optional[int] = None
+    is_active: Optional[bool] = None
+    fetch_limit: Optional[int] = None
+    pick_limit: Optional[int] = None
+    story_roundup_enabled: Optional[bool] = None
+    story_deep_dive_enabled: Optional[bool] = None
+    roundup_count: Optional[int] = None
+    deep_dive_count: Optional[int] = None
+    schedule_cron: Optional[str] = None
+    priority_weight: Optional[int] = None
+    country: Optional[str] = None
+    language: Optional[str] = None
+    category: Optional[str] = None
+    extra_params: Optional[dict] = None
+
+
+class TopicSourceConfigRead(TopicSourceConfigBase):
+    id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

@@ -6,12 +6,15 @@ sys.path.append(os.getcwd())
 
 from app.core.database import engine, Base
 from app.models.user import User
-from app.models.source import Source
 from app.models.topic import Topic
-from app.models.config import SourceTopicConfig
-from app.models.article_history import ArticleHistory
-# Quan trọng: Import thêm các model từ domain
-from app.models.article import Article, JobHistory
+from app.models.signal_source import SignalSource
+from app.models.topic_source_config import TopicSourceConfig
+from app.models.research_run import ResearchRun
+from app.models.signal_item import SignalItem
+from app.models.story import Story
+from app.models.story_evidence import StoryEvidence
+from app.models.editorial_note import EditorialNote
+from app.models.article import JobHistory
 
 def reset_database():
     print("⚠️  Đang tiến hành xoá toàn bộ dữ liệu cũ...")

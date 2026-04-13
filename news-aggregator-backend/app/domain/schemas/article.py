@@ -1,57 +1,45 @@
-from pydantic import BaseModel, HttpUrl
-from typing import Optional, List
 from datetime import datetime
+from typing import List, Optional
 
-class SourceBase(BaseModel):
-    name: str
-    base_url: str
-    is_active: bool = True
+from pydantic import BaseModel
 
-class SourceCreate(SourceBase):
-    pass
-
-class SourceUpdate(SourceBase):
-    name: Optional[str] = None
-    base_url: Optional[str] = None
-
-class Source(SourceBase):
-    id: int
-
-    class Config:
-        from_attributes = True
 
 class ArticleBase(BaseModel):
     title: str
-    category: Optional[str] = None
-    description: Optional[str] = None
-    content: str
-    url: str
-    image_url: Optional[str] = None
-    source_id: int
+    summary: Optional[str] = None
+    body: str
+    story_type: str = "roundup"
+    status: str = "draft"
+    topic_id: int
+    slug: str
+
 
 class ArticleCreate(ArticleBase):
     pass
 
+
 class ArticleUpdate(BaseModel):
     title: Optional[str] = None
     summary: Optional[str] = None
-    is_processed: Optional[bool] = None
-    image_url: Optional[str] = None
+    body: Optional[str] = None
+    story_type: Optional[str] = None
+    status: Optional[str] = None
+
 
 class ArticleRead(ArticleBase):
     id: int
-    summary: Optional[str] = None
     published_at: Optional[datetime] = None
-    processed_at: datetime
-    is_processed: bool
-    source: Optional[Source] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
 
+
 class ArticleList(BaseModel):
     items: List[ArticleRead]
     total: int
+
 
 class ArticleBulkDeleteRequest(BaseModel):
     ids: List[int]

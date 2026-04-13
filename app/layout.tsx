@@ -3,8 +3,8 @@ import "./globals.css";
 import PageLoader from "@/components/PageLoader";
 
 export const metadata: Metadata = {
-  title: "NewsHub - Tin tức nhanh, chính xác, đáng tin cậy",
-  description: "Đọc báo online với giao diện sạch sẽ, tươi sáng. Cập nhật tin tức mới nhất về thế giới, kinh tế, công nghệ, thể thao và nhiều chủ đề khác.",
+  title: "DevPulse - Tin tức, Việc làm IT & Xu hướng Công nghệ",
+  description: "Nhịp đập của cộng đồng Developer Việt Nam — tổng hợp tin tức tech, cơ hội việc làm IT và xu hướng công nghệ mới nhất mỗi ngày.",
 };
 
 export default function RootLayout({

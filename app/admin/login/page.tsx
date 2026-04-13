@@ -3,6 +3,8 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, User, Loader2, AlertCircle, Newspaper } from "lucide-react";
 
+import { getNewsApiV1 } from "@/lib/env";
+
 export default function AdminLoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -20,7 +22,7 @@ export default function AdminLoginPage() {
       formData.append("username", username);
       formData.append("password", password);
 
-      const response = await fetch("http://localhost:8000/api/v1/auth/login", {
+      const response = await fetch(`${getNewsApiV1()}/auth/login`, {
         method: "POST",
         body: formData,
       });

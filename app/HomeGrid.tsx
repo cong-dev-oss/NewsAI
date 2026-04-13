@@ -11,9 +11,9 @@ export default async function HomeGrid() {
   return (
     <section className="max-w-6xl mx-auto px-6 py-10">
       <div className="flex items-center justify-between mb-6 border-b border-gray-200 pb-4">
-        <h2 className="text-base font-bold text-gray-900 uppercase tracking-widest">Bài viết mới nhất</h2>
+        <h2 className="text-base font-bold text-gray-900 uppercase tracking-widest">Latest</h2>
         <Link href="/latest" className="text-xs text-gray-400 hover:text-gray-900 transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1">
-          Xem tất cả <i className="ri-arrow-right-line"></i>
+          Xem thêm <i className="ri-arrow-right-line"></i>
         </Link>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">

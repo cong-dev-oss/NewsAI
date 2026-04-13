@@ -1,13 +1,14 @@
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import HomeHero from './HomeHero';
+import HomeSituation from './HomeSituation';
 import HomeGrid from './HomeGrid';
 import HomeCategoriesSection from './HomeCategoriesSection';
 import HomeBreaking from './HomeBreaking';
-import { getArticles } from '@/lib/api';
+import { getStories } from '@/lib/api';
 
 export default async function Home() {
-  const latestArticles = await getArticles(5);
+  const latestArticles = await getStories(5, undefined, "roundup");
   const breakingTitles = latestArticles.length > 0 
     ? latestArticles.map(a => `🔴 ${a.category.toUpperCase()}: ${a.title}`)
     : undefined;
@@ -18,6 +19,7 @@ export default async function Home() {
       <HomeBreaking news={breakingTitles} />
       <main>
         <HomeHero />
+        <HomeSituation />
         <HomeGrid />
         <HomeCategoriesSection />
       </main>

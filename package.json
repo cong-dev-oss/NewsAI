@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "cross-env NODE_ENV=development next dev -H 0.0.0.0 -p 3000",
     "build": "next build",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node lib/newsApi.test.mjs && node lib/researchRunMetrics.test.mjs && node lib/pipelineRunFeedback.test.mjs && node lib/storyImage.test.mjs"
   },
   "dependencies": {
     "@react-google-maps/api": "^2.19.3",

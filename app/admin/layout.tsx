@@ -6,7 +6,10 @@ import {
   LogOut, Newspaper, 
   Menu, X, 
   User as UserIcon, 
-  Bell
+  Bell,
+  FlaskConical,
+  Tags,
+  Workflow
 } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -14,6 +17,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const [authorized, setAuthorized] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [navigatingPath, setNavigatingPath] = useState<string | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("admin_token");
@@ -24,6 +29,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }, [pathname, router]);
 
+  useEffect(() => {
+    setNavigatingPath(null);
+  }, [pathname]);
+
   if (pathname.includes("/admin/login")) {
     return <>{children}</>;
   }
@@ -31,14 +40,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (!authorized) return null;
 
   const handleLogout = () => {
+    setLoggingOut(true);
     localStorage.removeItem("admin_token");
     router.push("/admin/login");
   };
 
+  const handleNavigate = (path: string) => {
+    setNavigatingPath(path);
+    router.push(path);
+  };
+
   const menuItems = [
     { name: "Dashboard", path: "/admin/dashboard", icon: <LayoutDashboard size={18} /> },
+    { name: "Stories", path: "/admin/stories", icon: <Newspaper size={18} /> },
+    { name: "Research", path: "/admin/research", icon: <FlaskConical size={18} /> },
+    { name: "Topics", path: "/admin/topics", icon: <Tags size={18} /> },
+    { name: "Pipeline", path: "/admin/pipeline", icon: <Workflow size={18} /> },
     { name: "Settings", path: "/admin/configs", icon: <Settings size={18} /> },
-    { name: "Articles", path: "/admin/articles", icon: <Newspaper size={18} /> },
   ];
 
   return (
@@ -58,17 +76,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {menuItems.map((item) => (
             <button
               key={item.path}
-              onClick={() => router.push(item.path)}
+              onClick={() => handleNavigate(item.path)}
+              disabled={loggingOut}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all text-sm group ${
                 pathname === item.path 
                 ? 'bg-zinc-100 text-zinc-900 font-medium' 
                 : 'text-zinc-500 hover:bg-zinc-100/50 hover:text-zinc-900'
-              }`}
+              } ${loggingOut ? "opacity-60" : ""}`}
             >
               <span className={`${pathname === item.path ? 'text-zinc-900' : 'text-zinc-400 group-hover:text-zinc-900'} transition-colors`}>
                 {item.icon}
               </span>
-              {sidebarOpen && <span>{item.name}</span>}
+              {sidebarOpen && <span>{navigatingPath === item.path ? "Loading..." : item.name}</span>}
             </button>
           ))}
         </nav>
@@ -76,10 +95,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="p-4 mt-auto border-t border-zinc-100">
           <button 
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-zinc-500 hover:bg-red-50 hover:text-red-600 transition-all"
+            disabled={loggingOut}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-zinc-500 hover:bg-red-50 hover:text-red-600 transition-all disabled:opacity-60"
           >
             <LogOut size={18} />
-            {sidebarOpen && <span className="font-medium">Logout</span>}
+            {sidebarOpen && <span className="font-medium">{loggingOut ? "Logging out..." : "Logout"}</span>}
           </button>
         </div>
       </aside>

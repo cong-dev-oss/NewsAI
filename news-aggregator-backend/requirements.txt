@@ -7,7 +7,6 @@ pydantic
 pydantic-settings
 python-dotenv
 httpx
-beautifulsoup4
 celery
 redis
 python-multipart

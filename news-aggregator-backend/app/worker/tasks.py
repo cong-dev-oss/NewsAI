@@ -1,181 +1,364 @@
+from datetime import datetime
+import re
+import time
+from typing import Any, Dict, Optional
+
+import app.models  # noqa: F401  # Ensure SQLAlchemy model registry is fully loaded in workers.
 from app.core.celery_app import celery_app
-from app.services.crawler_service import CrawlerService
-from app.services.ai_service import AIService
-from app.services.tts_service import TTSService
-from app.services.state_service import StateService
+from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.config import SourceTopicConfig
-from app.models.article_history import ArticleHistory
-from app.models.user import User
-from app.models.source import Source
-from app.models.topic import Topic
-from app.models.article import Article, JobHistory
-from app.core.config import settings
-import time
+from app.models.research_run import ResearchRun
+from app.models.signal_item import SignalItem
+from app.models.story import Story
+from app.models.story_evidence import StoryEvidence
+from app.models.topic_source_config import TopicSourceConfig
+from app.services.ai_service import AIService
+from app.services.news_api_service import NewsAPIService
+from app.services.signal_ingestion_service import SignalIngestionService
+from app.services.signal_scoring_service import SignalScoringService
+from app.services.story_generation_service import StoryGenerationService
 
-@celery_app.task(bind=True)
-def run_config_crawl(self, config_id: int):
-    """Nhiệm vụ tổng thể: cào links của một config_id rồi chạy các bài viết"""
-    db = SessionLocal()
-    try:
-        config = db.query(SourceTopicConfig).get(config_id)
-        if not config or not config.is_active:
-            return {"status": "skipped", "message": "Config not found or inactive"}
-            
-        # 1. Tìm các links từ category_url
-        links = CrawlerService.get_links_from_category(config.url, limit=config.article_limit)
-        
-        # 2. Với mỗi link, tạo 1 ArticleHistory vào DB và khởi chạy task xử lý lẻ
-        task_results = []
-        for link in links:
-            # Kiểm tra xem link này đã từng xử lý chưa (optionally skip)
-            # existing = db.query(ArticleHistory).filter(ArticleHistory.url == link, ArticleHistory.config_id == config_id).first()
-            # if existing: continue
 
-            # Tạo record lịch sử PENDING
-            new_history = ArticleHistory(
-                config_id=config_id,
-                url=link,
-                status="PENDING",
-                progress=0.0
+def _detect_source_type(identifier: str) -> str:
+    value = (identifier or "").lower()
+    if "newsdata" in value:
+        return "newsdata"
+    if "gnews" in value:
+        return "gnews"
+    if "tradingeconomics" in value:
+        return "tradingeconomics"
+    return "custom"
+
+
+def _coerce_extra_params(extra_params: Any) -> Dict[str, Any]:
+    if isinstance(extra_params, dict):
+        return extra_params
+    return {}
+
+
+def _slugify(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", (value or "").lower()).strip("-")
+    return slug or "story"
+
+
+def _make_unique_slug(db, base_slug: str, run_id: int, index: int) -> str:
+    candidate = f"{base_slug}-{run_id}-{index}"
+    while db.query(Story).filter(Story.slug == candidate).first():
+        candidate = f"{candidate}-{int(time.time())}"
+    return candidate
+
+
+def _normalize_image_url(value: Any) -> Optional[str]:
+    candidate = str(value or "").strip()
+    if not candidate:
+        return None
+    if candidate.startswith("//"):
+        return f"https:{candidate}"
+    if candidate.startswith("http://") or candidate.startswith("https://"):
+        return candidate
+    return None
+
+
+def _extract_image_from_payload(payload: Any) -> Optional[str]:
+    if not isinstance(payload, dict):
+        return None
+
+    direct_keys = (
+        "image_url",
+        "image",
+        "urlToImage",
+        "imageUrl",
+        "thumbnail",
+        "thumb",
+    )
+    for key in direct_keys:
+        url = _normalize_image_url(payload.get(key))
+        if url:
+            return url
+
+    media = payload.get("media")
+    if isinstance(media, list):
+        for item in media:
+            url = _extract_image_from_payload(item)
+            if url:
+                return url
+    elif isinstance(media, dict):
+        url = _extract_image_from_payload(media)
+        if url:
+            return url
+
+    enclosure = payload.get("enclosure")
+    if isinstance(enclosure, dict):
+        url = _extract_image_from_payload(enclosure)
+        if url:
+            return url
+
+    return None
+
+
+def _pick_story_hero_image(selected_signals: list[dict]) -> Optional[str]:
+    for signal in selected_signals:
+        direct_url = _normalize_image_url(signal.get("image_url"))
+        if direct_url:
+            return direct_url
+
+        raw_payload_url = _extract_image_from_payload(signal.get("raw_payload"))
+        if raw_payload_url:
+            return raw_payload_url
+    return None
+
+
+def _map_legacy_config(db, config_id: int) -> Optional[TopicSourceConfig]:
+    legacy_config = db.query(SourceTopicConfig).filter(SourceTopicConfig.id == config_id).first()
+    if not legacy_config:
+        return None
+
+    source_identifier = ""
+    if legacy_config.source and legacy_config.source.base_url:
+        source_identifier = legacy_config.source.base_url
+    elif legacy_config.source and legacy_config.source.name:
+        source_identifier = legacy_config.source.name
+    source_type = _detect_source_type(source_identifier)
+
+    mapped = (
+        db.query(TopicSourceConfig)
+        .filter(
+            TopicSourceConfig.topic_id == legacy_config.topic_id,
+            TopicSourceConfig.source_type == source_type,
+        )
+        .first()
+    )
+    if mapped:
+        return mapped
+
+    legacy_extra_params: Dict[str, Any] = {}
+    if legacy_config.url:
+        legacy_extra_params["url"] = legacy_config.url
+
+    mapped = TopicSourceConfig(
+        topic_id=legacy_config.topic_id,
+        source_type=source_type,
+        is_active=legacy_config.is_active,
+        fetch_limit=max(int(legacy_config.article_limit or 20), 1),
+        pick_limit=min(max(int(legacy_config.article_limit or 8), 1), 8),
+        schedule_cron=legacy_config.cron_config or "0 2 * * *",
+        priority_weight=100,
+        extra_params=legacy_extra_params or None,
+    )
+    db.add(mapped)
+    db.commit()
+    db.refresh(mapped)
+    return mapped
+
+
+def _create_story_with_evidence(
+    db,
+    *,
+    run: ResearchRun,
+    config: TopicSourceConfig,
+    topic_name: str,
+    story_type: str,
+    index: int,
+    selected_signals: list[dict],
+    created_signal_items: list[SignalItem],
+) -> None:
+    payload = StoryGenerationService.build_story_payload(
+        topic_name=topic_name,
+        story_type=story_type,
+        top_signals=selected_signals,
+    )
+    generated = AIService.generate_story_draft(payload["prompt"], story_type=story_type)
+
+    title = generated.get("title") or f"{topic_name} {story_type} {index}"
+    slug = _make_unique_slug(db, _slugify(title), run.id, index)
+    summary = generated.get("summary") or ""
+    body = generated.get("body") or payload["prompt"]
+
+    story = Story(
+        topic_id=config.topic_id,
+        primary_research_run_id=run.id,
+        story_type=story_type,
+        status="published" if settings.AUTO_PUBLISH_STORIES else "draft",
+        title=title,
+        slug=slug,
+        summary=summary,
+        body=body,
+        hero_image=_pick_story_hero_image(selected_signals),
+        published_at=datetime.utcnow() if settings.AUTO_PUBLISH_STORIES else None,
+    )
+    db.add(story)
+    db.flush()
+
+    max_evidence = min(len(created_signal_items), max(int(config.pick_limit or 0), 0))
+    for evidence_index in range(max_evidence):
+        signal_item = created_signal_items[evidence_index]
+        db.add(
+            StoryEvidence(
+                story_id=story.id,
+                signal_item_id=signal_item.id,
+                evidence_order=evidence_index,
+                excerpt_used=signal_item.excerpt,
             )
-            db.add(new_history)
+        )
+
+
+def _run_topic_source_research(
+    topic_source_config_id: int,
+    trigger_mode: str = "scheduled",
+    allow_legacy_mapping: bool = False,
+) -> Dict[str, Any]:
+    db = SessionLocal()
+    run: Optional[ResearchRun] = None
+    try:
+        config = (
+            db.query(TopicSourceConfig)
+            .filter(TopicSourceConfig.id == topic_source_config_id)
+            .first()
+        )
+        if not config and allow_legacy_mapping:
+            config = _map_legacy_config(db, topic_source_config_id)
+        if not config:
+            return {"status": "skipped", "message": "TopicSourceConfig not found"}
+        if not config.is_active:
+            return {"status": "skipped", "message": "TopicSourceConfig is inactive"}
+
+        run = ResearchRun(
+            topic_source_config_id=config.id,
+            topic_id=config.topic_id,
+            trigger_mode=trigger_mode,
+            status="running",
+            started_at=datetime.utcnow(),
+        )
+        db.add(run)
+        db.commit()
+        db.refresh(run)
+
+        raw_signals = NewsAPIService.fetch_signals(
+            source_type=config.source_type,
+            limit=max(int(config.fetch_limit or 20), 1),
+            country=config.country,
+            language=config.language,
+            category=config.category,
+            extra_params=_coerce_extra_params(config.extra_params),
+        )
+        topic_name = config.topic.name if config.topic else "General"
+        normalized = SignalIngestionService.normalize_items(
+            source_type=config.source_type,
+            topic_name=topic_name,
+            items=raw_signals,
+        )
+        selected = SignalScoringService.rank_signals(
+            signals=normalized,
+            priority_weight=int(config.priority_weight or 0),
+            pick_limit=max(int(config.pick_limit or 0), 0),
+        )
+
+        created_signal_items: list[SignalItem] = []
+        for signal in selected:
+            signal_item = SignalItem(
+                research_run_id=run.id,
+                topic_id=config.topic_id,
+                signal_source_id=config.signal_source_id,
+                source_type=config.source_type,
+                source_name=signal.get("source_name"),
+                title=signal.get("title", ""),
+                excerpt=signal.get("excerpt"),
+                original_url=signal.get("original_url"),
+                published_at=signal.get("published_at"),
+                language=signal.get("language"),
+                country=signal.get("country"),
+                signal_score=signal.get("signal_score"),
+                raw_payload=signal.get("raw_payload"),
+            )
+            db.add(signal_item)
+            created_signal_items.append(signal_item)
+        db.flush()
+
+        story_counter = 0
+        if config.story_roundup_enabled:
+            for _ in range(max(int(config.roundup_count or 0), 0)):
+                story_counter += 1
+                _create_story_with_evidence(
+                    db,
+                    run=run,
+                    config=config,
+                    topic_name=topic_name,
+                    story_type="roundup",
+                    index=story_counter,
+                    selected_signals=selected,
+                    created_signal_items=created_signal_items,
+                )
+        if config.story_deep_dive_enabled:
+            for _ in range(max(int(config.deep_dive_count or 0), 0)):
+                story_counter += 1
+                _create_story_with_evidence(
+                    db,
+                    run=run,
+                    config=config,
+                    topic_name=topic_name,
+                    story_type="deep_dive",
+                    index=story_counter,
+                    selected_signals=selected,
+                    created_signal_items=created_signal_items,
+                )
+
+        run.raw_count = len(normalized)
+        run.selected_count = len(selected)
+        run.status = "completed"
+        run.summary = (
+            f"Ingested {run.raw_count} signals from {config.source_type}; "
+            f"selected {run.selected_count} by score."
+        )
+        run.finished_at = datetime.utcnow()
+        db.commit()
+
+        return {
+            "status": "success",
+            "research_run_id": run.id,
+            "raw_count": run.raw_count,
+            "selected_count": run.selected_count,
+            "stories_created": story_counter,
+        }
+    except Exception as exc:
+        db.rollback()
+        if run:
+            run.status = "failed"
+            run.error_message = str(exc)
+            run.finished_at = datetime.utcnow()
+            db.add(run)
             db.commit()
-            db.refresh(new_history)
-            
-            # Khởi chạy task xử lý lẻ bài viết này
-            process_single_article.delay(new_history.id)
-            task_results.append(new_history.id)
-            
-        return {"status": "started", "articles_queued": len(task_results), "ids": task_results}
+        return {"status": "error", "message": str(exc), "research_run_id": run.id if run else None}
     finally:
         db.close()
 
 
-from app.services.state_service import StateService
+@celery_app.task(bind=True)
+def run_topic_source_research(self, topic_source_config_id: int):
+    return _run_topic_source_research(topic_source_config_id=topic_source_config_id)
+
 
 @celery_app.task(bind=True)
-def process_single_article(self, history_id: int):
-    """Nhiệm vụ chính: CRAWLING -> SUMMARIZING -> SAVING -> COMPLETED"""
-    db = SessionLocal()
-    history = db.query(ArticleHistory).get(history_id)
-    if not history:
-        db.close()
-        return {"status": "error", "message": "History not found"}
-    
-    url = history.url
-    config_id = history.config_id
-    source_id = history.config.source_id
-    category_name = history.config.topic.name if history.config and history.config.topic else None
-    db.close()
+def run_config_fetch(self, config_id: int):
+    # Legacy task wrapper for old scheduler/api code paths.
+    return _run_topic_source_research(
+        topic_source_config_id=config_id,
+        trigger_mode="legacy",
+        allow_legacy_mapping=True,
+    )
 
-    try:
-        # Step 1: Crawl (20%)
-        StateService.update_article_state(history_id, "CRAWLING", 0.20)
-        crawl_data = CrawlerService.crawl_article(url)
-        raw_text = crawl_data["content"]
-        article_title = crawl_data["title"] or "Untitled Article"
-        image_url = crawl_data["image_url"]
-
-        if not raw_text or len(raw_text) < 100:
-            StateService.update_article_state(history_id, "FAILED", 1.0, title=article_title)
-            return {"status": "failed", "message": "Content too short"}
-
-        # Step 2: Summarize (50%)
-        StateService.update_article_state(history_id, "SUMMARIZING", 0.50, title=article_title)
-        
-        summary = ""
-        max_retries = 2
-        for attempt in range(max_retries + 1):
-            try:
-                # AIService.summarize là hàm đồng bộ (sync), gọi trực tiếp
-                summary = AIService.summarize(raw_text)
-                if summary: break
-            except Exception as e:
-                print(f"Summarize attempt {attempt + 1}/{max_retries + 1} failed: {e}")
-                if attempt == max_retries: raise e
-                time.sleep(2)
-
-        if not summary:
-            summary = AIService.build_fallback_summary(raw_text)
-
-        # Step 3: Generate Audio from TTS (70%)
-        StateService.update_article_state(history_id, "GENERATING_AUDIO", 0.70, title=article_title)
-        audio_url = TTSService.generate_audio(summary)
-
-        # Step 4: Save to DB (90%)
-        StateService.update_article_state(history_id, "SAVING", 0.90, title=article_title)
-        
-        db = SessionLocal()
-        # Save the actual article
-        article = Article(
-            source_id=source_id,
-            title=article_title,
-            category=category_name,
-            content=raw_text,
-            summary=summary,
-            url=url,
-            image_url=image_url,
-            audio_url=audio_url,
-            is_processed=True,
-        )
-        db.add(article)
-        db.commit()
-        db.refresh(article)
-        db.close()
-
-        # Step 4: Complete (100%)
-        StateService.update_article_state(history_id, "COMPLETED", 1.0, title=article_title, summary=summary)
-        return {"status": "success", "article_id": article.id}
-
-    except Exception as e:
-        print(f"Error processing article {url}: {e}")
-        StateService.update_article_state(history_id, "FAILED", 1.0, title="Error Processing")
-        return {"status": "error", "message": str(e)}
-
-from app.services.research_service import ResearchService
 
 @celery_app.task(bind=True)
 def run_tech_research_task(self, topic: str):
-    """
-    Task chạy định kỳ (1 ngày 1 lần theo cấu hình)
-    để nghiên cứu và tổng hợp bài báo cáo công nghệ mới nhất.
-    """
-    db = SessionLocal()
+    from app.services.research_service import ResearchService
+
     try:
-        # Gọi tool Last30days-skill (qua ResearchService)
         raw_report = ResearchService.run_last_30_days_research(topic)
-        
-        # Tóm tắt và tạo CSS
-        summary = AIService.summarize(raw_report)
-        audio_url = TTSService.generate_audio(summary)
-        
-        # Tìm source default hoặc source ID riêng cho phân mục Nghiên Cứu
-        source = db.query(Source).filter_by(name="Last30Days-Research").first()
-        if not source:
-            source = Source(name="Last30Days-Research", url=settings.LAST30DAYS_REPO_URL, selector_config="none")
-            db.add(source)
-            db.commit()
-            db.refresh(source)
-            
-        research_article = Article(
-            source_id=source.id,
-            title=f"Tech Summary: {topic}",
-            category="Tech Summary",
-            content=raw_report,
-            summary=summary,
-            audio_url=audio_url,
-            url=f"research://{topic.replace(' ', '-').lower()}-{int(time.time())}",
-            image_url="",
-            is_processed=True,
-        )
-        db.add(research_article)
-        db.commit()
-        db.refresh(research_article)
-        
-        return {"status": "success", "article_id": research_article.id}
-    except Exception as e:
-        print(f"Error running tech research task: {e}")
-        return {"status": "error", "message": str(e)}
-    finally:
-        db.close()
+        return {
+            "status": "success",
+            "topic": topic,
+            "report_length": len(raw_report or ""),
+        }
+    except Exception as exc:
+        print(f"Error running tech research task: {exc}")
+        return {"status": "error", "message": str(exc)}

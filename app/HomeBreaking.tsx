@@ -26,7 +26,7 @@ export default function HomeBreaking({ news }: { news?: string[] }) {
     <div className="w-full bg-red-600">
       <div className="max-w-7xl mx-auto px-6 h-10 flex items-center gap-4">
         <span className="bg-white text-red-600 text-[10px] font-black px-2.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 animate-pulse">
-          NÓNG
+          BREAKING
         </span>
         <div className="overflow-hidden flex-1">
           <p className="text-white text-sm font-medium whitespace-nowrap overflow-hidden text-ellipsis">

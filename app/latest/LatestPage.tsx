@@ -1,14 +1,21 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { getArticles, getCategories } from '@/lib/api';
+import { getCategories, getStories } from '@/lib/api';
 import { Article } from '@/lib/mockData';
 import ArticleCard from '@/components/ArticleCard';
+import { useSearchParams } from 'next/navigation';
 
 export default function LatestPage() {
+  const searchParams = useSearchParams();
+  const topicParam = searchParams.get("topic");
   const [activeCategory, setActiveCategory] = useState('Tất cả');
   const [categories, setCategories] = useState<{name: string}[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (topicParam) setActiveCategory(topicParam);
+  }, [topicParam]);
 
   useEffect(() => {
     getCategories().then(setCategories);
@@ -17,7 +24,7 @@ export default function LatestPage() {
   useEffect(() => {
     setLoading(true);
     const catFilter = activeCategory === 'Tất cả' ? undefined : activeCategory;
-    getArticles(30, catFilter).then(data => {
+    getStories(30, undefined, catFilter).then(data => {
       setArticles(data);
       setLoading(false);
     });

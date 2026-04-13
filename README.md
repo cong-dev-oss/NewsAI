@@ -1,14 +1,14 @@
-# 🚀 NewsAI Aggregator - SaaS Admin Dashboard
+# 🚀 NewsAI Aggregator - Research-First Newsroom
 
-Hệ thống tóm tắt tin tức tự động dựa trên AI (Ollama qwen2.5:3b) với quy trình tự động hóa thời gian thực và quản trị chuyên nghiệp.
+Hệ thống newsroom AI theo mô hình research-first: thu thập tín hiệu từ nhiều nguồn, chấm điểm, tạo story tự động (`roundup`, `deep_dive`) và quản trị qua CMS.
 
 ## 🛠️ Công Nghệ Sử Dụng
 - **Backend**: FastAPI, SQLAlchemy (PostgreSQL), Redis (Pub/Sub). Architecture: **Layered Architecture**.
-- **Worker**: Celery & Celery Beat (Dynamic Database Scheduling & Daily Jobs).
+- **Worker**: Celery & Celery Beat (dynamic scheduler theo pipeline).
 - **AI Integration (Summarize)**: Ollama (Model: qwen2.5:3b), tóm tắt tiếng Việt.
 - **AI Integration (Audio)**: Void-Box Server cho chuyển đổi văn bản tóm tắt sang Audio.
-- **AI Integration (Research)**: Bản tin Công nghệ ứng dụng `mvanhorn/last30days-skill`.
-- **Frontend**: Next.js 15, TailwindCSS, Lucide-Icons, WebSockets (Giao diện hiển thị cả bài tin tức và trình phát Audio).
+- **Primary research sources**: NewsData.io, GNews, Trading Economics.
+- **Frontend**: Next.js 15, TailwindCSS, Lucide-Icons.
 - **Security & System**: JWT Authentication, Hashed Passwords. Tách bạch Config tại `app/core/config.py`.
 
 ---
@@ -51,7 +51,7 @@ cd news-aggregator-backend
 .\venv\Scripts\python.exe -m pip install "uvicorn[standard]" websockets wsproto
 
 # Run Backend
-.\venv\Scripts\uvicorn.exe app.main:app --host 0.0.0.0 --port 8000 --reload
+.\venv\Scripts\uvicorn.exe app.main:app --host 0.0.0.0 --port 8010 --reload
 
 # Run Processing Worker (In another terminal)
 .\venv\Scripts\celery.exe -A app.worker.celery_app worker --loglevel=info -P solo
@@ -67,10 +67,10 @@ npm run dev
 ## 🚀 Usage Guide
 
 1.  **Access Dashboard**: Open [http://localhost:3000/admin/dashboard](http://localhost:3000/admin/dashboard)
-2.  **Configure Pipelines**: Go to **System Configs** to add sources (e.g., VnExpress).
-3.  **Run Automation**: Click **Trigger Scan** on the Dashboard.
-4.  **Monitor Progress**: Watch the **Running Jobs** section for real-time AI progress (0-100%).
-5.  **View Results**: Browse articles at [http://localhost:3000/admin/articles](http://localhost:3000/admin/articles) or the NewsHub homepage.
+2.  **Configure Pipelines**: vào **Pipeline** để cấu hình cặp `source + topic`.
+3.  **Run Automation**: dùng **Run now** hoặc scheduler mặc định `0 2 * * *` (02:00 hàng ngày).
+4.  **Review Output**: duyệt story tại [http://localhost:3000/admin/stories](http://localhost:3000/admin/stories).
+5.  **Public Site**: trang chủ/public chỉ hiển thị story đã publish.
 
 ### 4. Truy cập
 - **Trang Đăng nhập**: `http://localhost:3000/admin/login`
@@ -83,7 +83,7 @@ npm run dev
 - **WinError 5 (Access Denied)**: Đảm bảo bạn thêm cờ `-P solo` khi chạy lệnh celery worker để tránh lỗi này trên Windows.
 - **WebSocket 404**: Luôn chắc chắn đã nạp thư viện uvicorn[standard] trước khi khởi động.
 - **Redis Connection Error**: Kiểm tra file `.env` đã trỏ đúng IP của Redis (mặc định là 192.168.119.128).
-- **Cài đặt Lịch trình**: `http://localhost:3000/admin/configs`
+- **Cài đặt Lịch trình**: `http://localhost:3000/admin/pipeline`
 
 ---
 

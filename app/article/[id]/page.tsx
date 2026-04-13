@@ -1,16 +1,16 @@
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { getArticleById, getArticles } from '@/lib/api';
+import { getStoryById, getStories } from '@/lib/api';
 import Link from 'next/link';
 
 export async function generateStaticParams() {
-  const latestArticles = await getArticles(100);
+  const latestArticles = await getStories(100);
   return latestArticles.map(a => ({ id: a.id }));
 }
 
 export default async function ArticlePage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
-  const realArticle = await getArticleById(resolvedParams.id);
+  const realArticle = await getStoryById(resolvedParams.id);
   
   if (!realArticle) {
     return (
@@ -88,16 +88,18 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
           )}
 
           {/* Link to original source */}
-          <div className="mt-8 mb-4">
-            <a 
-              href={article.url} 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
-            >
-              <i className="ri-external-link-line"></i> Xem bài viết gốc tại nguồn
-            </a>
-          </div>
+          {article.url?.startsWith("http") && (
+            <div className="mt-8 mb-4">
+              <a 
+                href={article.url} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                <i className="ri-external-link-line"></i> Xem bài viết gốc tại nguồn
+              </a>
+            </div>
+          )}
 
           {article.tags && article.tags.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-10 pt-6 border-t border-gray-100">

@@ -1,189 +1,115 @@
-"use client"
-import React, { useState, useEffect } from "react";
-import { api } from "@/lib/api";
-import { 
-  History, Clock, 
-  ExternalLink,
-  Play, CheckCircle2,
-  AlertCircle, Loader2
-} from "lucide-react";
+"use client";
+
+import React, { useEffect, useState } from "react";
+
+import { pipelineApi } from "@/lib/pipelineApi";
+import { storyApi } from "@/lib/storyApi";
 
 export default function DashboardPage() {
-  const [history, setHistory] = useState<any[]>([]);
-  const [activeTasks, setActiveTasks] = useState<Record<number, any>>({});
   const [loading, setLoading] = useState(true);
-  const [triggering, setTriggering] = useState(false);
+  const [stories, setStories] = useState<any[]>([]);
+  const [runs, setRuns] = useState<any[]>([]);
+  const [configs, setConfigs] = useState<any[]>([]);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const completedCount = history.filter((item) => item.status === "COMPLETED").length;
-  const failedCount = history.filter((item) => item.status === "FAILED").length;
-  const finishedCount = completedCount + failedCount;
-  const successRate = finishedCount === 0 ? 0 : (completedCount / finishedCount) * 100;
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const data = await api.getHistory();
-        setHistory(data);
-        setLoading(false);
-      } catch (e) {
-        console.error(e);
-      }
-    };
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws/progress";
-    const socket = new WebSocket(WS_URL);
-
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      setActiveTasks(prev => {
-        const next = { ...prev };
-
-        if (data.status === "COMPLETED" || data.status === "FAILED") {
-          delete next[data.id];
-          return next;
-        }
-
-        next[data.id] = data;
-        return next;
-      });
-
-      if (data.status === 'COMPLETED' || data.status === 'FAILED') {
-        setTimeout(() => {
-          api.getHistory().then(setHistory);
-        }, 3000);
-      }
-    };
-
-    return () => socket.close();
-  }, []);
-
-  const handleTriggerScan = async () => {
-    setTriggering(true);
+  const load = async () => {
+    setLoading(true);
     try {
-      await api.triggerAll();
-    } catch (e) {
-      console.error(e);
+      const [storyRows, runRows, configRows] = await Promise.all([
+        storyApi.list({ limit: 50 }),
+        fetch("/api/v1/research/runs").then((res) => res.json()),
+        pipelineApi.listConfigs(),
+      ]);
+      setStories(Array.isArray(storyRows) ? storyRows : []);
+      setRuns(Array.isArray(runRows) ? runRows : []);
+      setConfigs(Array.isArray(configRows) ? configRows : []);
+      setErrorMessage("");
+    } catch (error: any) {
+      setErrorMessage(error?.message || "Load dashboard failed");
     } finally {
-      setTriggering(false);
+      setLoading(false);
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "COMPLETED": return "bg-zinc-100 text-zinc-900 border-zinc-200";
-      case "FAILED": return "bg-red-50 text-red-600 border-red-100";
-      default: return "bg-zinc-900 text-white border-zinc-900 animate-pulse";
-    }
-  };
+  useEffect(() => {
+    load();
+  }, []);
+
+  const publishedCount = stories.filter((item) => item.status === "published").length;
+  const draftCount = stories.filter((item) => item.status === "draft").length;
+  const runSuccessCount = runs.filter((item) => item.status === "completed").length;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-10">
-      <div className="flex justify-between items-end">
+    <div className="max-w-6xl mx-auto space-y-8">
+      <div className="flex items-end justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-zinc-900">Dashboard</h1>
-          <p className="text-zinc-500 mt-1">Real-time system monitoring and processing history.</p>
+          <p className="text-zinc-500 mt-1">Newsroom pipeline and story operations overview.</p>
         </div>
-        <button 
-            disabled={triggering}
-            onClick={handleTriggerScan}
-            className="bg-zinc-900 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
+        <button
+          onClick={load}
+          disabled={loading}
+          className="px-4 py-2 text-sm rounded-md bg-zinc-900 text-white hover:bg-zinc-800 transition disabled:opacity-60"
         >
-            {triggering ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} fill="currentColor" />}
-            {triggering ? "Processing..." : "Trigger Scan"}
+          {loading ? "Refreshing..." : "Refresh"}
         </button>
       </div>
+      {errorMessage && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {errorMessage}
+        </div>
+      )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-zinc-500">Active Tasks</span>
-                <Clock size={16} className="text-zinc-400" />
-            </div>
-            <p className="text-2xl font-bold">{Object.keys(activeTasks).length}</p>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="p-5 rounded-xl border bg-white">
+          <p className="text-sm text-zinc-500">Stories</p>
+          <p className="text-2xl font-semibold">{stories.length}</p>
         </div>
-        <div className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-zinc-500">Total Processed</span>
-                <CheckCircle2 size={16} className="text-zinc-400" />
-            </div>
-            <p className="text-2xl font-bold">{finishedCount}</p>
+        <div className="p-5 rounded-xl border bg-white">
+          <p className="text-sm text-zinc-500">Published</p>
+          <p className="text-2xl font-semibold">{publishedCount}</p>
         </div>
-        <div className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-zinc-500">Success Rate</span>
-                <History size={16} className="text-zinc-400" />
-            </div>
-            <p className="text-2xl font-bold">{successRate.toFixed(1)}%</p>
+        <div className="p-5 rounded-xl border bg-white">
+          <p className="text-sm text-zinc-500">Drafts</p>
+          <p className="text-2xl font-semibold">{draftCount}</p>
+        </div>
+        <div className="p-5 rounded-xl border bg-white">
+          <p className="text-sm text-zinc-500">Active Pipelines</p>
+          <p className="text-2xl font-semibold">{configs.filter((item) => item.is_active).length}</p>
         </div>
       </div>
 
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-            Running Jobs
-        </h2>
-        {Object.keys(activeTasks).length === 0 ? (
-            <div className="p-12 text-center bg-zinc-50/50 rounded-xl border border-dashed border-zinc-200 text-zinc-400 text-sm">
-                No active processing tasks at the moment.
-            </div>
-        ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Object.values(activeTasks).map((task: any) => (
-                    <div key={task.id} className="bg-white p-4 rounded-xl border border-zinc-200 space-y-3">
-                        <div className="flex justify-between items-center">
-                            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Task #{task.id}</span>
-                            <span className="text-xs font-medium text-zinc-900">{Math.round(task.progress * 100)}%</span>
-                        </div>
-                        <h3 className="font-medium text-sm line-clamp-1">{task.title || "Initializing..."}</h3>
-                        <div className="w-full bg-zinc-100 rounded-full h-1 overflow-hidden">
-                            <div className="bg-zinc-900 h-full transition-all duration-500" style={{ width: `${task.progress * 100}%` }} />
-                        </div>
-                    </div>
-                ))}
-            </div>
-        )}
-      </section>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <section className="bg-white border rounded-xl">
+          <div className="px-4 py-3 border-b">
+            <h2 className="font-semibold">Recent Research Runs</h2>
+          </div>
+          <div className="p-4 space-y-3">
+            {loading ? (
+              <p className="text-sm text-zinc-500">Loading...</p>
+            ) : (
+              runs.slice(0, 6).map((run) => (
+                <div key={run.id} className="flex items-center justify-between text-sm">
+                  <span>Run #{run.id}</span>
+                  <span className="text-zinc-500">{run.status}</span>
+                </div>
+              ))
+            )}
+            {!loading && runs.length === 0 && <p className="text-sm text-zinc-500">No runs yet.</p>}
+          </div>
+        </section>
 
-      <section className="space-y-4 pb-10">
-        <h2 className="text-lg font-semibold">Recent Activity</h2>
-        <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-            <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-zinc-50 border-b border-zinc-200 text-zinc-500 font-medium">
-                        <tr>
-                            <th className="px-6 py-3">Article</th>
-                            <th className="px-6 py-3 text-center">Status</th>
-                            <th className="px-6 py-3">Processed At</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-100">
-                        {loading ? (
-                            <tr><td colSpan={3} className="px-6 py-10 text-center text-zinc-400">Loading history...</td></tr>
-                        ) : history.slice(0, 10).map((item: any) => (
-                            <tr key={item.id} className="hover:bg-zinc-50/50 transition-colors">
-                                <td className="px-6 py-4">
-                                    <p className="font-medium text-zinc-900 line-clamp-1">{item.title}</p>
-                                    <a href={item.url} target="_blank" className="text-xs text-zinc-400 hover:text-zinc-600 flex items-center gap-1 mt-1">
-                                        Source <ExternalLink size={10} />
-                                    </a>
-                                </td>
-                                <td className="px-6 py-4 text-center">
-                                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-tight ${getStatusBadge(item.status)}`}>
-                                        {item.status}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 text-zinc-500 tabular-nums">
-                                    {new Date(item.processed_at).toLocaleString('en-US', { hour12: false, month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-      </section>
+        <section className="bg-white border rounded-xl">
+          <div className="px-4 py-3 border-b">
+            <h2 className="font-semibold">Story Throughput</h2>
+          </div>
+          <div className="p-4 text-sm text-zinc-600 space-y-2">
+            <p>Completed runs: {runSuccessCount}</p>
+            <p>Roundup stories: {stories.filter((item) => item.story_type === "roundup").length}</p>
+            <p>Deep dive stories: {stories.filter((item) => item.story_type === "deep_dive").length}</p>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

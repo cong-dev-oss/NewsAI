@@ -35,10 +35,19 @@ class Settings(BaseSettings):
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     OPENAI_MODEL: str = "gpt-4o-mini"
     OPENAI_TIMEOUT_SECONDS: float = 90.0
-    OPENAI_PROMPT_MAX_CHARS: int = 1200
-    OPENAI_MAX_COMPLETION_TOKENS: int = 120
-    OPENAI_TEMPERATURE: float = 0.1
+    OPENAI_PROMPT_MAX_CHARS: int = 12000 # Increased for larger context summaries
+    OPENAI_MAX_COMPLETION_TOKENS: int = 500 # Increased for situation summaries
+    OPENAI_TEMPERATURE: float = 0.2
+    OPENAI_VIETNAMESE_STRICT: bool = True
+    AUTO_PUBLISH_STORIES: bool = True
+    AUTO_CREATE_TABLES: bool = False
     
+    # News Providers API Keys
+    NEWSDATA_API_KEY: str = ""
+    GNEWS_API_KEY: str = ""
+    TRADING_ECONOMICS_API_KEY: str = ""
+    CUSTOM_API_BASE_URL: str = ""
+
     # External Services
     VOID_BOX_URL: str = "http://192.168.119.128:8000/tts"
     LAST30DAYS_REPO_URL: str = "https://github.com/mvanhorn/last30days-skill"

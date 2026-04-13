@@ -1,13 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from typing import List
 from app.core.database import get_db
-from app.models.source import Source as SourceModel
+from app.models.article_history import ArticleHistory as LegacyHistoryModel
+from app.models.config import SourceTopicConfig as LegacyConfigModel
+from app.models.signal_source import SignalSource as SourceModel
 from app.models.topic import Topic as TopicModel
-from app.models.config import SourceTopicConfig as ConfigModel
+from app.models.topic_source_config import TopicSourceConfig as ConfigModel
 from app.schemas import source_schema, topic_schema, job_schema
 from app.worker.scheduler import SchedulerService
-from app.worker.tasks import run_config_crawl
+from app.worker.tasks import run_topic_source_research
 
 router = APIRouter()
 
@@ -16,7 +19,7 @@ def trigger_all_tasks(db: Session = Depends(get_db)):
     configs = db.query(ConfigModel).filter(ConfigModel.is_active == True).all()
     triggered = 0
     for config in configs:
-        run_config_crawl.delay(config.id)
+        run_topic_source_research.delay(config.id)
         triggered += 1
     return {"status": "success", "triggered_count": triggered}
 
@@ -52,20 +55,34 @@ def delete_topic(topic_id: int, db: Session = Depends(get_db)):
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
 
-    if topic.configs:
+    if topic.topic_source_configs:
         raise HTTPException(status_code=409, detail="Topic is being used by one or more pipelines")
 
+    legacy_configs = db.query(LegacyConfigModel).filter(LegacyConfigModel.topic_id == topic_id).all()
+    if legacy_configs:
+        legacy_ids = [cfg.id for cfg in legacy_configs]
+        db.query(LegacyHistoryModel).filter(LegacyHistoryModel.config_id.in_(legacy_ids)).delete(
+            synchronize_session=False
+        )
+        db.query(LegacyConfigModel).filter(LegacyConfigModel.id.in_(legacy_ids)).delete(
+            synchronize_session=False
+        )
+
     db.delete(topic)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Topic cannot be deleted due to existing dependencies")
     return {"status": "success", "deleted_id": topic_id}
 
 # Config CRUD
-@router.get("/configs", response_model=List[job_schema.SourceTopicConfig])
+@router.get("/configs", response_model=List[job_schema.TopicSourceConfigRead])
 def get_configs(db: Session = Depends(get_db)):
     return db.query(ConfigModel).all()
 
-@router.post("/configs", response_model=job_schema.SourceTopicConfig)
-def create_config(config: job_schema.SourceTopicConfigCreate, db: Session = Depends(get_db)):
+@router.post("/configs", response_model=job_schema.TopicSourceConfigRead)
+def create_config(config: job_schema.TopicSourceConfigCreate, db: Session = Depends(get_db)):
     db_config = ConfigModel(**config.model_dump())
     db.add(db_config)
     db.commit()
@@ -76,8 +93,8 @@ def create_config(config: job_schema.SourceTopicConfigCreate, db: Session = Depe
     
     return db_config
 
-@router.put("/configs/{config_id}", response_model=job_schema.SourceTopicConfig)
-def update_config(config_id: int, config: job_schema.SourceTopicConfigUpdate, db: Session = Depends(get_db)):
+@router.put("/configs/{config_id}", response_model=job_schema.TopicSourceConfigRead)
+def update_config(config_id: int, config: job_schema.TopicSourceConfigUpdate, db: Session = Depends(get_db)):
     db_config = db.query(ConfigModel).filter(ConfigModel.id == config_id).first()
     if not db_config:
         raise HTTPException(status_code=404, detail="Config not found")
@@ -92,3 +109,15 @@ def update_config(config_id: int, config: job_schema.SourceTopicConfigUpdate, db
     SchedulerService.sync_config_to_celery(db, db_config)
 
     return db_config
+
+
+@router.delete("/configs/{config_id}")
+def delete_config(config_id: int, db: Session = Depends(get_db)):
+    db_config = db.query(ConfigModel).filter(ConfigModel.id == config_id).first()
+    if not db_config:
+        raise HTTPException(status_code=404, detail="Config not found")
+
+    SchedulerService.remove_config_from_celery(db, config_id)
+    db.delete(db_config)
+    db.commit()
+    return {"status": "success", "deleted_id": config_id}
