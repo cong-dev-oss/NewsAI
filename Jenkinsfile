@@ -20,8 +20,9 @@ pipeline {
           # Khởi tạo thư mục chạy
           mkdir -p ${DEMO_PATH}
           
-          # Đồng bộ các source code cần thiết ra thư mục Demo
-          rsync -avz --exclude '.git' --delete ./ ${DEMO_PATH}/
+          # Đồng bộ các source code cần thiết ra thư mục Demo (Bỏ rsync vì Agent chưa cài)
+          cp -R . ${DEMO_PATH}/ || true
+          rm -rf ${DEMO_PATH}/.git
 
           cd ${DEMO_PATH}
           
