@@ -15,6 +15,14 @@ export interface Article {
   summary?: string;
   content?: string;
   audio_url?: string;
+  story_type?: string;
+  highlights?: Array<{
+    title: string;
+    excerpt?: string;
+    image_url?: string;
+    original_url?: string;
+    source_name?: string;
+  }>;
 }
 
 export const categories = [

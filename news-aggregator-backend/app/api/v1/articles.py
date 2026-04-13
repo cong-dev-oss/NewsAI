@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from sqlalchemy import func
 from app.core.database import get_db
 from app.domain.schemas.article import ArticleRead, ArticleCreate, ArticleUpdate, ArticleList, ArticleBulkDeleteRequest
 from app.models.story import Story
+from app.models.topic import Topic
 
 router = APIRouter()
 
@@ -15,23 +17,22 @@ def read_articles(
     status: Optional[str] = None,
     category: Optional[str] = None,
 ):
-    query = db.query(Story).order_by(Story.published_at.desc(), Story.id.desc())
+    query = db.query(Story).join(Story.topic).order_by(Story.published_at.desc(), Story.id.desc())
     if status is not None:
         query = query.filter(Story.status == status)
     if category is not None:
-        query = query.filter(Story.story_type == category)
+        query = query.filter(Topic.name.ilike(category.strip()))
     
     articles = query.offset(skip).limit(limit).all()
     return articles
 
 @router.get("/categories")
 def get_active_categories(db: Session = Depends(get_db)):
-    from sqlalchemy import func
-
     results = (
-        db.query(Story.story_type, func.count(Story.id).label("count"))
-        .filter(Story.story_type != None)
-        .group_by(Story.story_type)
+        db.query(Topic.name, func.count(Story.id).label("count"))
+        .join(Story, Story.topic_id == Topic.id)
+        .filter(Topic.name != None)
+        .group_by(Topic.name)
         .having(func.count(Story.id) > 0)
         .all()
     )

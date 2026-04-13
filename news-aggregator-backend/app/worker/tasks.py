@@ -97,8 +97,14 @@ def _extract_image_from_payload(payload: Any) -> Optional[str]:
     return None
 
 
-def _pick_story_hero_image(selected_signals: list[dict]) -> Optional[str]:
-    for signal in selected_signals:
+def _pick_story_hero_image(selected_signals: list[dict], preferred_index: int = 0) -> Optional[str]:
+    if not selected_signals:
+        return None
+
+    start = preferred_index % len(selected_signals)
+    ordered_signals = selected_signals[start:] + selected_signals[:start]
+
+    for signal in ordered_signals:
         direct_url = _normalize_image_url(signal.get("image_url"))
         if direct_url:
             return direct_url
@@ -184,7 +190,7 @@ def _create_story_with_evidence(
         slug=slug,
         summary=summary,
         body=body,
-        hero_image=_pick_story_hero_image(selected_signals),
+        hero_image=_pick_story_hero_image(selected_signals, preferred_index=max(index - 1, 0)),
         published_at=datetime.utcnow() if settings.AUTO_PUBLISH_STORIES else None,
     )
     db.add(story)
@@ -308,7 +314,8 @@ def _run_topic_source_research(
         run.status = "completed"
         run.summary = (
             f"Ingested {run.raw_count} signals from {config.source_type}; "
-            f"selected {run.selected_count} by score."
+            f"selected {run.selected_count} by score; "
+            f"generated {story_counter} stories."
         )
         run.finished_at = datetime.utcnow()
         db.commit()

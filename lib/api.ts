@@ -1,7 +1,7 @@
 import { Article } from "./mockData";
 import { ENV, getNewsApiV1 } from "./env";
 import { fetchFromNewsApi } from "./newsApi";
-import { resolveStoryImage } from "./storyImage";
+import { PLACEHOLDER_STORY_IMAGE, resolveStoryImage } from "./storyImage";
 
 const INTERNAL_CATEGORIES_ENDPOINT = "/api/categories";
 const INTERNAL_STORIES_ENDPOINT = "/api/stories";
@@ -34,17 +34,54 @@ const mapStoryToArticle = (story: any): Article => ({
   url: story.original_url || "",
   title: story.title || "Untitled story",
   excerpt: story.deck || story.summary || (story.body ? String(story.body).slice(0, 180) + "..." : ""),
-  category: (story.story_type || "story").replace("_", " "),
+  category: story.topic_name || story.topic?.name || (story.story_type || "story").replace("_", " "),
   categoryColor: "#333",
   author: "Newsroom AI",
   authorInitials: "AI",
   date: new Date(story.published_at || story.created_at || Date.now()).toLocaleDateString("vi-VN"),
   readTime: "4 min read",
-  image: resolveStoryImage(story, { apiBase: ENV.NEWS_API_URL }),
+  image: resolveStoryImage(
+    {
+      ...story,
+      hero_image: story.hero_image || story.effective_hero_image,
+    },
+    { apiBase: ENV.NEWS_API_URL },
+  ),
   featured: false,
   summary: story.summary || "",
   content: story.body || "",
+  story_type: story.story_type || "",
+  highlights: Array.isArray(story.highlights)
+    ? story.highlights.map((item: any) => ({
+        title: item?.title || "Untitled signal",
+        excerpt: item?.excerpt || "",
+        image_url: resolveStoryImage(
+          {
+            hero_image: item?.image_url,
+            image_url: item?.image_url,
+          },
+          { apiBase: ENV.NEWS_API_URL },
+        ),
+        original_url: item?.original_url || "",
+        source_name: item?.source_name || "",
+      }))
+    : [],
 });
+
+const dedupeArticleImages = (articles: Article[]): Article[] => {
+  const seenImages = new Set<string>();
+  return articles.map((article) => {
+    const imageKey = String(article.image || "").trim();
+    if (!imageKey || imageKey === PLACEHOLDER_STORY_IMAGE) {
+      return article;
+    }
+    if (seenImages.has(imageKey)) {
+      return { ...article, image: PLACEHOLDER_STORY_IMAGE };
+    }
+    seenImages.add(imageKey);
+    return article;
+  });
+};
 
 export const getStories = async (
   limit = 10,
@@ -54,7 +91,7 @@ export const getStories = async (
 ): Promise<Article[]> => {
   const query = buildQuery({
     limit: String(limit),
-    topic_id: topic,
+    topic_name: topic,
     story_type: storyType,
     status,
   });
@@ -66,7 +103,7 @@ export const getStories = async (
         : await fetchFromNewsApi(`/stories/${query}`, { cache: "no-store" });
     if (!res.ok) return [];
     const data = await res.json();
-    return Array.isArray(data) ? data.map(mapStoryToArticle) : [];
+    return Array.isArray(data) ? dedupeArticleImages(data.map(mapStoryToArticle)) : [];
   } catch (error) {
     console.error("Fetch stories error:", error);
     return [];
@@ -94,7 +131,7 @@ export const getArticles = async (
   is_processed: boolean = true,
 ): Promise<Article[]> => {
   const status = is_processed ? "published" : "draft";
-  return getStories(limit, undefined, category, status);
+  return getStories(limit, category, undefined, status);
 };
 
 export const getAllArticles = async (limit = 100): Promise<any[]> => {

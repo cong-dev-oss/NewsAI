@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Article } from '@/lib/mockData';
+import FallbackImage from '@/components/FallbackImage';
 
 interface Props {
   article: Article;
@@ -9,7 +10,7 @@ export default function ArticleCard({ article }: Props) {
   return (
     <Link href={`/article/${article.id}`} className="group block cursor-pointer">
       <div className="w-full h-48 overflow-hidden mb-4">
-        <img src={article.image} alt={article.title} className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500" />
+        <FallbackImage src={article.image} alt={article.title} className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500" />
       </div>
       <div className="flex items-center justify-between">
          <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">{article.category || "story"}</span>

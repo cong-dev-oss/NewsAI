@@ -24,7 +24,7 @@ export default function LatestPage() {
   useEffect(() => {
     setLoading(true);
     const catFilter = activeCategory === 'Tất cả' ? undefined : activeCategory;
-    getStories(30, undefined, catFilter).then(data => {
+    getStories(30, catFilter).then(data => {
       setArticles(data);
       setLoading(false);
     });

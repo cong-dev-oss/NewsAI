@@ -1,5 +1,6 @@
 import { articles } from '@/lib/mockData';
 import ArticleCard from '@/components/ArticleCard';
+import FallbackImage from '@/components/FallbackImage';
 import Link from 'next/link';
 
 export default function FeaturedPage() {
@@ -14,7 +15,7 @@ export default function FeaturedPage() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
         <Link href={`/article/${hero.id}`} className="group relative overflow-hidden rounded-sm block cursor-pointer" style={{ minHeight: 380 }}>
-          <img src={hero.image} alt={hero.title} className="w-full h-full object-cover object-top absolute inset-0 group-hover:scale-105 transition-transform duration-700" />
+          <FallbackImage src={hero.image} alt={hero.title} className="w-full h-full object-cover object-top absolute inset-0 group-hover:scale-105 transition-transform duration-700" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
           <div className="absolute bottom-0 p-6">
             <span className="text-xs font-semibold uppercase tracking-widest text-gray-300 mb-2 block">{hero.category}</span>
@@ -30,7 +31,7 @@ export default function FeaturedPage() {
           </div>
         </Link>
         <Link href={`/article/${second.id}`} className="group relative overflow-hidden rounded-sm block cursor-pointer" style={{ minHeight: 380 }}>
-          <img src={second.image} alt={second.title} className="w-full h-full object-cover object-top absolute inset-0 group-hover:scale-105 transition-transform duration-700" />
+          <FallbackImage src={second.image} alt={second.title} className="w-full h-full object-cover object-top absolute inset-0 group-hover:scale-105 transition-transform duration-700" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
           <div className="absolute bottom-0 p-6">
             <span className="text-xs font-semibold uppercase tracking-widest text-gray-300 mb-2 block">{second.category}</span>

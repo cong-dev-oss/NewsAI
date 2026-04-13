@@ -5,6 +5,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.models.research_run import ResearchRun
+from app.models.signal_item import SignalItem
+from app.models.story import Story
+from app.models.story_evidence import StoryEvidence
 from app.models.topic_source_config import TopicSourceConfig
 from app.schemas import job_schema
 from app.schemas.research_schema import PipelineRunNowRequest
@@ -12,6 +16,40 @@ from app.worker.scheduler import SchedulerService
 from app.worker.tasks import run_topic_source_research
 
 router = APIRouter(prefix="/pipeline", tags=["pipeline"])
+
+
+def _delete_pipeline_config_dependencies(db: Session, config_id: int) -> None:
+    run_ids = [
+        run_id
+        for (run_id,) in db.query(ResearchRun.id)
+        .filter(ResearchRun.topic_source_config_id == config_id)
+        .all()
+    ]
+    if not run_ids:
+        return
+
+    db.query(Story).filter(Story.primary_research_run_id.in_(run_ids)).update(
+        {Story.primary_research_run_id: None},
+        synchronize_session=False,
+    )
+
+    signal_item_ids = [
+        signal_item_id
+        for (signal_item_id,) in db.query(SignalItem.id)
+        .filter(SignalItem.research_run_id.in_(run_ids))
+        .all()
+    ]
+    if signal_item_ids:
+        db.query(StoryEvidence).filter(StoryEvidence.signal_item_id.in_(signal_item_ids)).delete(
+            synchronize_session=False
+        )
+
+    db.query(SignalItem).filter(SignalItem.research_run_id.in_(run_ids)).delete(
+        synchronize_session=False
+    )
+    db.query(ResearchRun).filter(ResearchRun.topic_source_config_id == config_id).delete(
+        synchronize_session=False
+    )
 
 
 @router.get("/configs", response_model=List[job_schema.TopicSourceConfigRead])
@@ -99,6 +137,7 @@ def delete_pipeline_config(config_id: int, db: Session = Depends(get_db)):
     if not config:
         raise HTTPException(status_code=404, detail="Pipeline config not found")
     SchedulerService.remove_config_from_celery(db, config_id)
+    _delete_pipeline_config_dependencies(db, config_id)
     db.delete(config)
     db.commit()
     return {"status": "success", "deleted_id": config_id}

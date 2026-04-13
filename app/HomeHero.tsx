@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getArticles } from '@/lib/api';
+import FallbackImage from '@/components/FallbackImage';
 
 export default async function HomeHero() {
   const data = await getArticles(4);
@@ -24,7 +25,7 @@ export default async function HomeHero() {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
         <Link href={`/article/${hero.id}`} className="lg:col-span-3 group cursor-pointer block">
           <div className="w-full h-72 lg:h-96 overflow-hidden rounded-sm mb-5">
-            <img src={hero.image} alt={hero.title} className="w-full h-full object-cover object-top group-hover:scale-102 transition-transform duration-700" />
+            <FallbackImage src={hero.image} alt={hero.title} className="w-full h-full object-cover object-top group-hover:scale-102 transition-transform duration-700" />
           </div>
           <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">{hero.category}</span>
           <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 leading-tight mt-2 mb-3 group-hover:text-gray-600 transition-colors">
@@ -50,7 +51,7 @@ export default async function HomeHero() {
                 <span className="text-xs text-gray-400 mt-2 block">{article.date}</span>
               </div>
               <div className="w-20 h-16 flex-shrink-0 overflow-hidden rounded-sm">
-                <img src={article.image} alt={article.title} className="w-full h-full object-cover object-top" />
+                <FallbackImage src={article.image} alt={article.title} className="w-full h-full object-cover object-top" />
               </div>
             </Link>
           ))}

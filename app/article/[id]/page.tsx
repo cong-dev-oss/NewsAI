@@ -1,6 +1,7 @@
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { getStoryById, getStories } from '@/lib/api';
+import FallbackImage from '@/components/FallbackImage';
 import Link from 'next/link';
 
 export async function generateStaticParams() {
@@ -29,6 +30,9 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
 
   const article = realArticle;
   const related: any[] = []; // Currently no related API, so leaving as empty
+  const roundupHighlights = Array.isArray(article.highlights) ? article.highlights : [];
+  const showRoundupHighlights = article.story_type === "roundup" && roundupHighlights.length > 0;
+  const normalizeCompareText = (value: string | undefined) => String(value || "").replace(/\s+/g, " ").trim().toLowerCase().replace(/^-+\s*/, "");
 
   return (
     <div className="min-h-screen bg-white">
@@ -70,11 +74,40 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
         )}
 
         <div className="w-full h-80 lg:h-[450px] overflow-hidden mb-10 rounded-sm">
-          <img src={article.image} alt={article.title} className="w-full h-full object-cover object-center" />
+          <FallbackImage src={article.image} alt={article.title} className="w-full h-full object-cover object-center" />
         </div>
 
         <div className="text-gray-700 whitespace-pre-wrap">
-          {realArticle?.content ? (
+          {showRoundupHighlights ? (
+            <div className="mb-10">
+              <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">Tổng hợp nhanh theo từng ý</h3>
+              <div className="space-y-5">
+                {roundupHighlights.map((item, index) => (
+                  <article key={`${item.title}-${index}`} className="border border-gray-200 rounded-lg p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+                      <div className="md:col-span-1 h-28 overflow-hidden rounded">
+                        <FallbackImage src={item.image_url} alt={item.title} className="w-full h-full object-cover object-center" />
+                      </div>
+                      <div className="md:col-span-3">
+                        <h4 className="text-base font-semibold text-gray-900 leading-snug">{item.title}</h4>
+                        {item.excerpt && normalizeCompareText(item.excerpt) !== normalizeCompareText(item.title) && (
+                          <p className="text-sm text-gray-600 mt-2 leading-relaxed">{item.excerpt}</p>
+                        )}
+                        <div className="flex items-center gap-3 mt-3 text-xs text-gray-500">
+                          {item.source_name && <span>{item.source_name}</span>}
+                          {item.original_url && (
+                            <a href={item.original_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800">
+                              Xem nguồn
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          ) : realArticle?.content ? (
             <div className="prose prose-lg max-w-none text-gray-700 leading-loose" style={{ fontFamily: "'Lora', serif" }}>
               {realArticle.content.split('\n').map((p, i) => (
                 <p key={i} className="mb-6">{p}</p>
@@ -122,7 +155,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
                     <span className="text-xs text-gray-400 mt-1.5 block">{a.date} · {a.readTime}</span>
                   </div>
                   <div className="w-24 h-16 flex-shrink-0 overflow-hidden rounded-sm">
-                    <img src={a.image} alt={a.title} className="w-full h-full object-cover object-center" />
+                    <FallbackImage src={a.image} alt={a.title} className="w-full h-full object-cover object-center" />
                   </div>
                 </Link>
               ))}

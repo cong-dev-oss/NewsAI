@@ -3,6 +3,8 @@ from typing import Any, Dict, List, Optional
 
 
 class SignalIngestionService:
+    SCHEMA_SHORT_TEXT_LIMIT = 16
+
     @staticmethod
     def _clean_text(value: Any) -> str:
         if value is None:
@@ -19,6 +21,13 @@ class SignalIngestionService:
             return SignalIngestionService._clean_text(value[0]) or None
         text = SignalIngestionService._clean_text(value)
         return text or None
+
+    @staticmethod
+    def _to_limited_scalar(value: Any, max_length: int) -> Optional[str]:
+        text = SignalIngestionService._to_scalar(value)
+        if not text:
+            return None
+        return text[:max_length]
 
     @staticmethod
     def _parse_published_at(value: Any) -> Optional[datetime]:
@@ -69,8 +78,12 @@ class SignalIngestionService:
             "source_name": SignalIngestionService._to_scalar(
                 item.get("source_name") or item.get("source_id")
             ),
-            "language": SignalIngestionService._to_scalar(item.get("language")),
-            "country": SignalIngestionService._to_scalar(item.get("country")),
+            "language": SignalIngestionService._to_limited_scalar(
+                item.get("language"), SignalIngestionService.SCHEMA_SHORT_TEXT_LIMIT
+            ),
+            "country": SignalIngestionService._to_limited_scalar(
+                item.get("country"), SignalIngestionService.SCHEMA_SHORT_TEXT_LIMIT
+            ),
         }
 
     @staticmethod
@@ -89,8 +102,12 @@ class SignalIngestionService:
             "source_name": SignalIngestionService._to_scalar(
                 item.get("source_name") or source_data.get("name")
             ),
-            "language": SignalIngestionService._to_scalar(item.get("language")),
-            "country": SignalIngestionService._to_scalar(item.get("country")),
+            "language": SignalIngestionService._to_limited_scalar(
+                item.get("language"), SignalIngestionService.SCHEMA_SHORT_TEXT_LIMIT
+            ),
+            "country": SignalIngestionService._to_limited_scalar(
+                item.get("country"), SignalIngestionService.SCHEMA_SHORT_TEXT_LIMIT
+            ),
         }
 
     @staticmethod
@@ -108,8 +125,12 @@ class SignalIngestionService:
             "source_name": SignalIngestionService._to_scalar(
                 item.get("source_name") or item.get("source")
             ),
-            "language": SignalIngestionService._to_scalar(item.get("language")),
-            "country": SignalIngestionService._to_scalar(item.get("country")),
+            "language": SignalIngestionService._to_limited_scalar(
+                item.get("language"), SignalIngestionService.SCHEMA_SHORT_TEXT_LIMIT
+            ),
+            "country": SignalIngestionService._to_limited_scalar(
+                item.get("country"), SignalIngestionService.SCHEMA_SHORT_TEXT_LIMIT
+            ),
         }
 
     @staticmethod
@@ -127,8 +148,12 @@ class SignalIngestionService:
             ),
             "published_at": SignalIngestionService._parse_published_at(item.get("published_at")),
             "source_name": SignalIngestionService._to_scalar(item.get("source_name")),
-            "language": SignalIngestionService._to_scalar(item.get("language")),
-            "country": SignalIngestionService._to_scalar(item.get("country")),
+            "language": SignalIngestionService._to_limited_scalar(
+                item.get("language"), SignalIngestionService.SCHEMA_SHORT_TEXT_LIMIT
+            ),
+            "country": SignalIngestionService._to_limited_scalar(
+                item.get("country"), SignalIngestionService.SCHEMA_SHORT_TEXT_LIMIT
+            ),
         }
 
     @classmethod

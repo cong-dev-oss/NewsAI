@@ -27,5 +27,13 @@ class Story(Base):
 
     topic = relationship("Topic", back_populates="stories")
     primary_research_run = relationship("ResearchRun", back_populates="primary_stories")
-    story_evidences = relationship("StoryEvidence", back_populates="story")
-    editorial_notes = relationship("EditorialNote", back_populates="story")
+    story_evidences = relationship(
+        "StoryEvidence",
+        back_populates="story",
+        cascade="all, delete-orphan",
+    )
+    editorial_notes = relationship(
+        "EditorialNote",
+        back_populates="story",
+        cascade="all, delete-orphan",
+    )

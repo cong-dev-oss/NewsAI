@@ -25,7 +25,12 @@ def test_signal_ingestion_preserves_image_url() -> None:
 
 def test_tasks_set_hero_image_from_signals() -> None:
     text = TASKS_FILE.read_text(encoding="utf-8")
-    assert "hero_image=_pick_story_hero_image(selected_signals)" in text
+    assert "hero_image=_pick_story_hero_image(selected_signals, preferred_index=max(index - 1, 0))" in text
+
+
+def test_run_summary_mentions_generated_story_count() -> None:
+    text = TASKS_FILE.read_text(encoding="utf-8")
+    assert "generated {story_counter} stories." in text
 
 
 if __name__ == "__main__":
@@ -33,4 +38,5 @@ if __name__ == "__main__":
     test_tasks_assign_story_status_from_auto_publish_toggle()
     test_signal_ingestion_preserves_image_url()
     test_tasks_set_hero_image_from_signals()
+    test_run_summary_mentions_generated_story_count()
     print("story auto-publish and image checks passed")
