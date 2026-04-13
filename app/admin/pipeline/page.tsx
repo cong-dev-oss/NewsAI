@@ -129,7 +129,7 @@ export default function PipelinePage() {
           triggeredCount,
           kickoffDetected,
           targetLabel: "pipeline(s)",
-        }),
+        }) as RunFeedback,
       );
       await load(false);
     } catch (error: any) {
@@ -153,7 +153,7 @@ export default function PipelinePage() {
           triggeredCount,
           kickoffDetected,
           targetLabel: `pipeline config #${configId}`,
-        }),
+        }) as RunFeedback,
       );
       await load(false);
     } catch (error: any) {
