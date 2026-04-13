@@ -4,9 +4,12 @@ import { getStoryById, getStories } from '@/lib/api';
 import FallbackImage from '@/components/FallbackImage';
 import Link from 'next/link';
 
+// Force dynamic rendering — backend is not available during Docker build
+export const dynamic = 'force-dynamic';
+
 export async function generateStaticParams() {
-  const latestArticles = await getStories(100);
-  return latestArticles.map(a => ({ id: a.id }));
+  // Return empty during build; articles are fetched at runtime
+  return [];
 }
 
 export default async function ArticlePage({ params }: { params: Promise<{ id: string }> }) {
