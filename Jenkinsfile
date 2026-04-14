@@ -36,7 +36,10 @@ pipeline {
     stage('Build & Deploy') {
       steps {
         sh '''
-          # Chạy trực tiếp từ workspace Jenkins - không cần copy ra ngoài
+          # Dừng và xóa container cũ trước (tránh conflict tên container)
+          docker compose down --remove-orphans --timeout 30 || true
+
+          # Build image mới và khởi chạy
           docker compose build
           docker compose up -d
         '''
