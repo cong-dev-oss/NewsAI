@@ -150,6 +150,7 @@ def _delete_story_dependencies(db: Session, story_id: int) -> None:
 
 
 @router.get("/categories")
+@router.get("/categories/")
 def list_story_categories(db: Session = Depends(get_db)):
     rows = (
         db.query(Topic.name, func.count(Story.id).label("count"))
@@ -162,6 +163,7 @@ def list_story_categories(db: Session = Depends(get_db)):
     return [{"name": row[0], "count": row[1]} for row in rows]
 
 
+@router.get("", response_model=List[StoryRead])
 @router.get("/", response_model=List[StoryRead])
 def list_stories(
     db: Session = Depends(get_db),
