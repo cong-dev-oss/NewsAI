@@ -7,6 +7,13 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Truyền API URL lúc build để Next.js bake vào rewrites config
+ARG NEWS_API_URL=http://api:8000
+ARG JOB_API_URL=http://api:8000
+ENV NEWS_API_URL=$NEWS_API_URL
+ENV JOB_API_URL=$JOB_API_URL
+
 RUN npm run build
 
 FROM node:18-alpine AS runner
