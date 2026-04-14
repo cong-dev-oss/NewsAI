@@ -31,10 +31,16 @@ class NewsAPIService:
 
     @staticmethod
     def _request_json(base_url: str, params: Dict[str, Any]) -> Any:
-        response = httpx.get(base_url, params=params, timeout=15.0)
-        if response.status_code != 200:
-            raise RuntimeError(response.text)
-        return response.json()
+        try:
+            response = httpx.get(base_url, params=params, timeout=15.0)
+            if response.status_code != 200:
+                print(f"API Error: Status {response.status_code} for {base_url}")
+                print(f"Response Body: {response.text}")
+                return {} # Return empty dict on error instead of raising to allow logs to persist
+            return response.json()
+        except Exception as exc:
+            print(f"HTTP Request Exception: {exc}")
+            return {}
 
     @staticmethod
     def fetch_newsdata(params_str: ParamInput, limit: int = 10) -> List[Dict]:

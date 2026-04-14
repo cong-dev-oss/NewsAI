@@ -282,6 +282,21 @@ def _run_topic_source_research(
         db.flush()
 
         story_counter = 0
+        if not selected:
+             run.raw_count = len(normalized)
+             run.selected_count = 0
+             run.status = "completed"
+             run.summary = f"Ingested {run.raw_count} signals from {config.source_type}, but none were selected by score. No stories generated."
+             run.finished_at = datetime.utcnow()
+             db.commit()
+             return {
+                 "status": "success",
+                 "research_run_id": run.id,
+                 "raw_count": run.raw_count,
+                 "selected_count": 0,
+                 "stories_created": 0,
+             }
+
         if config.story_roundup_enabled:
             for _ in range(max(int(config.roundup_count or 0), 0)):
                 story_counter += 1
