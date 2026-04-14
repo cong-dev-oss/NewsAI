@@ -24,6 +24,7 @@ def trigger_all_tasks(db: Session = Depends(get_db)):
     return {"status": "success", "triggered_count": triggered}
 
 # Source CRUD
+@router.get("", response_model=List[source_schema.Source])
 @router.get("/", response_model=List[source_schema.Source])
 def get_sources(db: Session = Depends(get_db)):
     return db.query(SourceModel).all()

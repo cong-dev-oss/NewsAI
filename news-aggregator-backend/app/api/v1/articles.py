@@ -9,6 +9,7 @@ from app.models.topic import Topic
 
 router = APIRouter()
 
+@router.get("", response_model=List[ArticleRead])
 @router.get("/", response_model=List[ArticleRead])
 def read_articles(
     db: Session = Depends(get_db), 
