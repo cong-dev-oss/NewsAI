@@ -59,3 +59,12 @@ class Settings(BaseSettings):
         extra = "ignore"
 
 settings = Settings()
+
+# Diagnostic prints for Docker environment
+print(f"--- CONFIG DIAGNOSTIC ---")
+print(f"PROJECT_NAME: {settings.PROJECT_NAME}")
+print(f"NEWSDATA_API_KEY present: {bool(settings.NEWSDATA_API_KEY)}")
+if settings.NEWSDATA_API_KEY:
+    print(f"NEWSDATA_API_KEY (last 4): ...{settings.NEWSDATA_API_KEY[-4:]}")
+print(f"GNEWS_API_KEY present: {bool(settings.GNEWS_API_KEY)}")
+print(f"-------------------------")
