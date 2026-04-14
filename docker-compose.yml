@@ -26,7 +26,7 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - path: ./news-aggregator-backend/.env
+      - path: /srv/secrets/news-ai-backend.env
         required: false
     environment:
       - POSTGRES_HOST=db
@@ -42,7 +42,7 @@ services:
     container_name: news_worker
     command: celery -A app.worker.celery_app worker --loglevel=info --concurrency=1
     env_file:
-      - path: ./news-aggregator-backend/.env
+      - path: /srv/secrets/news-ai-backend.env
         required: false
     environment:
       - POSTGRES_HOST=db
@@ -62,7 +62,7 @@ services:
     ports:
       - "3000:3000"
     env_file:
-      - path: ./.env.local
+      - path: /srv/secrets/news-ai-frontend.env
         required: false
     environment:
       - NEWS_API_URL=http://api:8000
