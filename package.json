@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "cross-env NODE_ENV=development next dev -H 0.0.0.0 -p 3000",
     "build": "next build",
+    "start": "next start -H 0.0.0.0 -p 3000",
     "lint": "next lint",
     "test": "node lib/newsApi.test.mjs && node lib/researchRunMetrics.test.mjs && node lib/pipelineRunFeedback.test.mjs && node lib/storyImage.test.mjs && node lib/errorMessage.test.mjs && node lib/requestLimit.test.mjs"
   },
