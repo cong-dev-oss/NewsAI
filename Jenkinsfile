@@ -36,12 +36,15 @@ pipeline {
     stage('Build & Deploy') {
       steps {
         sh '''
-          # Dừng và xóa container cũ trước (tránh conflict tên container)
-          docker compose down --remove-orphans --timeout 30 || true
+          # Xóa cứng các container theo tên (tránh conflict khi project name khác)
+          docker rm -f news_frontend news_api news_worker news_db news_redis 2>/dev/null || true
 
-          # Build image mới và khởi chạy
-          docker compose build
-          docker compose up -d
+          # Down project hiện tại để clean network/volume orphans
+          docker compose -p newsai down --remove-orphans --timeout 10 || true
+
+          # Build image mới và khởi chạy với project name nhất quán
+          docker compose -p newsai build
+          docker compose -p newsai up -d
         '''
       }
     }
