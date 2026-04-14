@@ -69,18 +69,8 @@ const mapStoryToArticle = (story: any): Article => ({
 });
 
 const dedupeArticleImages = (articles: Article[]): Article[] => {
-  const seenImages = new Set<string>();
-  return articles.map((article) => {
-    const imageKey = String(article.image || "").trim();
-    if (!imageKey || imageKey === PLACEHOLDER_STORY_IMAGE) {
-      return article;
-    }
-    if (seenImages.has(imageKey)) {
-      return { ...article, image: PLACEHOLDER_STORY_IMAGE };
-    }
-    seenImages.add(imageKey);
-    return article;
-  });
+  // Disabling deduping as it causes confusion when multiple stories share the same event image
+  return articles;
 };
 
 export const getStories = async (

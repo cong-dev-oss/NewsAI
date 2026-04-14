@@ -44,7 +44,7 @@ def _extract_image_from_payload(payload: Any) -> Optional[str]:
     if not isinstance(payload, dict):
         return None
 
-    for key in ("image_url", "image", "urlToImage", "imageUrl", "thumbnail", "thumb"):
+    for key in ("image_url", "image", "urlToImage", "imageUrl", "thumbnail", "thumb", "url", "src", "link"):
         image_url = _normalize_image_url(payload.get(key))
         if image_url:
             return image_url
@@ -118,10 +118,27 @@ def _to_story_read(story: Story, include_highlights: bool = False) -> StoryRead:
                 str(signal_item.excerpt or evidence.excerpt_used or ""),
             )
             translated_lines = [line.strip("- ").strip() for line in translated.splitlines() if line.strip()]
-            translated_title = translated_lines[0] if translated_lines else (signal_item.title or "Tin nổi bật")
-            translated_excerpt = " ".join(translated_lines[1:]).strip() if len(translated_lines) > 1 else translated
+            
+            if len(translated_lines) >= 2:
+                translated_title = translated_lines[0]
+                translated_excerpt = " ".join(translated_lines[1:]).strip()
+            elif len(translated_lines) == 1:
+                # If only one line, try to split by colon or just use it as title
+                line = translated_lines[0]
+                if ":" in line:
+                    parts = line.split(":", 1)
+                    translated_title = parts[0].strip()
+                    translated_excerpt = parts[1].strip()
+                else:
+                    translated_title = line
+                    translated_excerpt = ""
+            else:
+                translated_title = signal_item.title or "Tin nổi bật"
+                translated_excerpt = ""
+
             translated_title = translated_title.lstrip("- ").strip()
             translated_excerpt = translated_excerpt.lstrip("- ").strip()
+
             if _normalize_compare_text(translated_title) == _normalize_compare_text(translated_excerpt):
                 translated_excerpt = ""
             highlights.append(
@@ -186,7 +203,11 @@ def list_stories(
     if published_only:
         query = query.filter(Story.status == "published")
     stories = query.limit(limit).all()
-    return [_to_story_read(story, include_highlights=False) for story in stories]
+    # For Roundups or Deep Dives, we often want to show highlights even in list view
+    return [
+        _to_story_read(story, include_highlights=(story.story_type in ["roundup", "deep_dive"])) 
+        for story in stories
+    ]
 
 
 @router.get("/{story_id}", response_model=StoryRead)
